@@ -17,9 +17,15 @@ unduh artifact "ControlCenter-apk".
 Jika layanan diblokir ("setelan terbatas", Android 13+): Info aplikasi >
 menu titik tiga > Izinkan setelan terbatas.
 
+## Mode
+- **Mode A**: Wi-Fi, data, Bluetooth, pesawat, lokasi, mode gelap, NFC membuka menu sistem.
+- **Mode B**: memakai aplikasi Shizuku untuk mengubahnya langsung. Jalankan Shizuku
+  (lewat Debugging nirkabel, Android 11+), pilih Mode B, lalu tekan "Izinkan Shizuku".
+  Ulangi menjalankan Shizuku setelah HP restart. Dukungan perintah tergantung perangkat.
+
 ## Batasan
 - Panel bawaan tidak dihapus; geseran kanan atas dialihkan ke panel ini.
-- Wi-Fi, internet, Bluetooth, mode pesawat membuka panel/pengaturan sistem.
+- Hotspot selalu membuka pengaturan. Bluetooth tersambung lewat pengaturan sistem.
 - Blur hanya di Android 12+ pada perangkat yang mendukung.
 
 ## Ubah transparansi
