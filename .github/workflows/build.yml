@@ -1,5 +1,7 @@
 name: Build APK
 on: [push, workflow_dispatch]
+permissions:
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -10,5 +12,13 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with: { gradle-version: '8.7' }
       - run: gradle assembleDebug
-      - uses: actions/upload-artifact@v4
-        with: { name: ControlCenter-apk, path: app/build/outputs/apk/debug/app-debug.apk }
+      - name: Terbitkan APK di Releases
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk ControlCenter.apk
+          gh release create "v${{ github.run_number }}-${{ github.run_attempt }}" ControlCenter.apk \
+            --target "$GITHUB_SHA" --latest \
+            --title "Control Center v${{ github.run_number }}" \
+            --notes "Unduh ControlCenter.apk lalu pasang di HP (Android 10+)."
