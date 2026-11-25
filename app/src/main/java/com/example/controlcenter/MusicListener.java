@@ -9,10 +9,13 @@ import android.media.SoundPool;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
 import android.service.notification.NotificationListenerService;
 import android.service.notification.StatusBarNotification;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -25,6 +28,7 @@ public class MusicListener extends NotificationListenerService {
     private static Runnable observer;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final Map<String, String> seen = new HashMap<>();
+    private final Map<String, StatusBarNotification> held = new LinkedHashMap<>();
     private SoundPool sounds;
     private int sound;
     private long lastSound;
@@ -48,6 +52,7 @@ public class MusicListener extends NotificationListenerService {
     @Override public void onListenerConnected() {
         instance = this;
         for (StatusBarNotification n : active()) seen.put(n.getKey(), signature(n));
+        applyHints();
         changed();
     }
 
@@ -71,22 +76,62 @@ public class MusicListener extends NotificationListenerService {
         if (getCurrentRanking().getRanking(n.getKey(), ranking)
                 && ranking.getImportance() < NotificationManager.IMPORTANCE_LOW) return;
         if (getCurrentInterruptionFilter() != INTERRUPTION_FILTER_ALL) return;
+        applyHints();
         playSound();
-        main.post(() -> OverlayService.banner(n));
+        main.post(() -> {
+            // Popup bawaan disingkirkan hanya bila popup kita benar-benar tampil.
+            if (OverlayService.banner(n) && Prefs.is(this, "removeNative", false)
+                    && n.isClearable() && !urgent(n)) {
+                held.put(n.getKey(), n);
+                dismissNative(n.getKey());
+                changed();
+            }
+        });
     }
 
-    @Override public void onNotificationRemoved(StatusBarNotification n) {
+    @Override public void onNotificationRemoved(StatusBarNotification n, RankingMap map,
+            int reason) {
         seen.remove(n.getKey());
+        // Dibatalkan aplikasinya (misalnya pesan sudah dibaca): hapus juga salinan kita.
+        if (reason != REASON_LISTENER_CANCEL) held.remove(n.getKey());
         changed();
+    }
+
+    private static boolean urgent(StatusBarNotification n) {
+        String c = n.getNotification().category;
+        return Notification.CATEGORY_CALL.equals(c) || Notification.CATEGORY_ALARM.equals(c)
+                || n.getNotification().fullScreenIntent != null;
+    }
+
+    private void dismissNative(String key) {
+        try { cancelNotification(key); } catch (Exception ignored) { }
+    }
+
+    /** Minta sistem membisukan suara bawaan agar tidak bertabrakan dengan suara kita. */
+    private void hints() {
+        boolean mute = Prefs.is(this, "sound", true) && Prefs.is(this, "muteNative", true);
+        try { requestListenerHints(mute ? HINT_HOST_DISABLE_NOTIFICATION_EFFECTS : 0); }
+        catch (Exception ignored) { }
+    }
+
+    static void applyHints() {
+        if (instance != null) instance.hints();
     }
 
     private void playSound() {
         if (!Prefs.is(this, "sound", true)) return;
-        if (getSystemService(AudioManager.class).getRingerMode()
-                != AudioManager.RINGER_MODE_NORMAL) return;
+        int mode = getSystemService(AudioManager.class).getRingerMode();
+        if (mode == AudioManager.RINGER_MODE_SILENT) return;
         long now = SystemClock.elapsedRealtime();
         if (now - lastSound < 2500) return;
         lastSound = now;
+        boolean muted = Prefs.is(this, "muteNative", true);
+        // Getar bawaan ikut dibisukan, jadi digantikan di sini.
+        if (muted) {
+            getSystemService(Vibrator.class).vibrate(
+                    VibrationEffect.createWaveform(new long[]{0, 120, 80, 120}, -1));
+        }
+        if (mode != AudioManager.RINGER_MODE_NORMAL) return;
         sounds.play(sound, 1, 1, 1, 0, 1);
     }
 
@@ -133,15 +178,18 @@ public class MusicListener extends NotificationListenerService {
     static List<StatusBarNotification> list() {
         List<StatusBarNotification> out = new ArrayList<>();
         if (instance == null) return out;
+        Map<String, StatusBarNotification> all = new LinkedHashMap<>(instance.held);
         for (StatusBarNotification n : instance.active()) {
-            if (instance.visible(n)) out.add(n);
+            if (instance.visible(n)) all.put(n.getKey(), n);
         }
+        out.addAll(all.values());
         out.sort((a, b) -> Long.compare(b.getPostTime(), a.getPostTime()));
         return out;
     }
 
     static void dismiss(String key) {
         if (instance == null) return;
-        try { instance.cancelNotification(key); } catch (Exception ignored) { }
+        if (instance.held.remove(key) != null) instance.changed();
+        instance.dismissNative(key);
     }
 }

@@ -74,6 +74,94 @@ class NoteCard extends LinearLayout {
         addView(row, new LayoutParams(-1, -2));
     }
 
+    /**
+     * Tombol Balas dan Tandai dibaca bila aplikasinya mendukung.
+     * onType dipanggil saat kolom balasan dibuka, done setelah aksi berhasil.
+     */
+    void actions(StatusBarNotification n, Runnable onType, Runnable done) {
+        Context context = getContext();
+        android.app.Notification.Action reply = Prefs.is(context, "hideContent", false)
+                ? null : Notes.replyAction(n);
+        android.app.Notification.Action read = Notes.readAction(n);
+        if (reply == null && read == null) return;
+        LinearLayout buttons = new LinearLayout(context);
+        LayoutParams top = new LayoutParams(-1, -2);
+        top.topMargin = dp(10);
+        if (reply != null) {
+            button(buttons, "Balas", () -> {
+                buttons.setVisibility(GONE);
+                addView(replyRow(n, reply, done), indexOfChild(buttons) + 1, top);
+                onType.run();
+                View row = getChildAt(indexOfChild(buttons) + 1);
+                View input = ((LinearLayout) row).getChildAt(0);
+                input.postDelayed(() -> {
+                    input.requestFocus();
+                    context.getSystemService(android.view.inputmethod.InputMethodManager.class)
+                            .showSoftInput(input, 0);
+                }, 250);
+            });
+        }
+        if (read != null) {
+            button(buttons, "Tandai dibaca", () -> {
+                if (Notes.send(context, read.actionIntent, null)) {
+                    MusicListener.dismiss(n.getKey());
+                    done.run();
+                } else {
+                    toast("Gagal menandai dibaca");
+                }
+            });
+        }
+        addView(buttons, top);
+    }
+
+    private LinearLayout replyRow(StatusBarNotification n,
+            android.app.Notification.Action reply, Runnable done) {
+        Context context = getContext();
+        LinearLayout row = new LinearLayout(context);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        android.widget.EditText input = new android.widget.EditText(context);
+        input.setHint("Tulis balasan");
+        input.setHintTextColor(0x99FFFFFF);
+        input.setTextColor(Color.WHITE);
+        input.setTextSize(15);
+        input.setMaxLines(3);
+        input.setPadding(dp(16), dp(10), dp(16), dp(10));
+        input.setBackground(new Glass(context, 24, 0x22FFFFFF));
+        row.addView(input, new LayoutParams(0, -2, 1));
+        ImageView send = new ImageView(context);
+        send.setImageResource(R.drawable.ic_play);
+        send.setColorFilter(Theme.onAccent(context));
+        send.setContentDescription("Kirim");
+        send.setPadding(dp(13), dp(13), dp(13), dp(13));
+        send.setBackground(new Glass(context, 24, Theme.accent(context)));
+        send.setOnClickListener(v -> {
+            String message = input.getText().toString().trim();
+            if (message.isEmpty()) return;
+            boolean ok = Notes.reply(context, reply, message);
+            toast(ok ? "Terkirim" : "Gagal mengirim");
+            if (ok) done.run();
+        });
+        LayoutParams p = new LayoutParams(dp(48), dp(48));
+        p.leftMargin = dp(8);
+        row.addView(send, p);
+        return row;
+    }
+
+    private void button(LinearLayout row, String label, Runnable click) {
+        TextView t = line(label, 13, Color.WHITE);
+        t.setGravity(Gravity.CENTER);
+        t.setBackground(new Glass(getContext(), 22, 0x26FFFFFF));
+        t.setOnClickListener(v -> click.run());
+        LayoutParams p = new LayoutParams(0, dp(42), 1);
+        p.setMargins(dp(3), 0, dp(3), 0);
+        row.addView(t, p);
+    }
+
+    private void toast(String message) {
+        android.widget.Toast.makeText(getContext(), message,
+                android.widget.Toast.LENGTH_SHORT).show();
+    }
+
     void gestures(Runnable dismiss, Runnable pullDown, Runnable swipeUp) {
         this.dismiss = dismiss;
         this.pullDown = pullDown;

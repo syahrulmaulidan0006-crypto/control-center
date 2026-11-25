@@ -138,8 +138,18 @@ public class MainActivity extends Activity {
         toggle("Sembunyikan popup saat layar penuh", "hideFullscreen", true);
         toggle("Geser kiri atas untuk pusat notifikasi", "leftSwipe", true);
         button("Pilih aplikasi yang boleh muncul", this::apps);
-        note("Agar tidak dobel, matikan suara dan notifikasi mengambang bawaan "
-                + "di pengaturan tiap aplikasi.");
+        toggle("Bisukan suara bawaan (agar tidak dobel)", "muteNative", true);
+        boolean heads = Settings.Global.getInt(getContentResolver(),
+                "heads_up_notifications_enabled", 1) == 1;
+        title("Popup bawaan HP", 20);
+        button(heads ? "Matikan popup bawaan semua aplikasi (Shizuku)"
+                : "Nyalakan kembali popup bawaan (Shizuku)", () -> headsUp(!heads));
+        note(heads ? "Cara terbersih. Memerlukan Shizuku aktif. Sebagian HP mengabaikannya."
+                : "Popup bawaan sedang dimatikan. Nyalakan kembali sebelum menghapus aplikasi.");
+        toggle("Tanpa Shizuku: hapus notifikasi bawaan saat popup kita tampil",
+                "removeNative", false);
+        note("Popup bawaan bisa terlihat sekejap, dan notifikasinya hilang dari panel "
+                + "bawaan. Salinannya ada di pusat notifikasi kita.");
 
         title("Mode koneksi", 20);
         boolean b = Prefs.is(this, "modeB", false);
@@ -207,6 +217,20 @@ public class MainActivity extends Activity {
         if (Build.VERSION.SDK_INT >= 31) p.add(Manifest.permission.BLUETOOTH_CONNECT);
         if (Build.VERSION.SDK_INT >= 33) p.add(Manifest.permission.POST_NOTIFICATIONS);
         requestPermissions(p.toArray(new String[0]), 1);
+    }
+
+    private void headsUp(boolean on) {
+        if (!Shell.ready()) {
+            Toast.makeText(this, "Jalankan dan izinkan Shizuku dahulu", Toast.LENGTH_LONG).show();
+            try {
+                if (Shizuku.pingBinder()) Shizuku.requestPermission(2);
+            } catch (Throwable ignored) { }
+            return;
+        }
+        Shell.run(this, shell -> shell.toggle("headsup", on), ok -> {
+            if (!ok) Toast.makeText(this, "Tidak didukung di HP ini", Toast.LENGTH_SHORT).show();
+            root.postDelayed(this::build, 400);
+        });
     }
 
     private void mode(boolean b) {
@@ -351,7 +375,7 @@ public class MainActivity extends Activity {
         s.setChecked(Prefs.is(this, key, fallback));
         s.setOnCheckedChangeListener((v, on) -> {
             Prefs.of(this).edit().putBoolean(key, on).commit();
-            if (key.equals("leftSwipe")) {
+            if (key.equals("leftSwipe") || key.equals("sound") || key.equals("muteNative")) {
                 sendBroadcast(new Intent(OverlayService.REFRESH).setPackage(getPackageName()));
             }
         });

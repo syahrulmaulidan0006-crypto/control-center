@@ -103,7 +103,8 @@ class Center extends Sheet {
         super.onDetachedFromWindow();
     }
 
-    private final Runnable rebuild = this::build;
+    private boolean replying;
+    private final Runnable rebuild = () -> { if (!replying) build(); };
 
     private void build() {
         list.removeAllViews();
@@ -165,6 +166,14 @@ class Center extends Sheet {
                 c.setVisibility(GONE);
             }, null, null);
         }
+        c.actions(n, () -> {
+            replying = true;
+            service.setKeyboard(true);
+        }, () -> {
+            replying = false;
+            service.setKeyboard(false);
+            postDelayed(rebuild, 300);
+        });
         LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2);
         p.topMargin = dp(10);
         list.addView(c, p);

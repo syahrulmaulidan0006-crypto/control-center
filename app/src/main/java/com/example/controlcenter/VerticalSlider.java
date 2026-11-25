@@ -16,10 +16,14 @@ class VerticalSlider extends View {
 
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path clip = new Path();
-    private final Drawable icon;
+    private Drawable icon;
+    private int shownIcon, zeroIcon, lowIcon;
+    private final int baseIcon;
+    private boolean touching;
     private final Listener listener;
     private final BooleanSupplier allowed;
-    private float value;
+    private float value, target = -1;
+    private android.animation.ValueAnimator animator;
     private boolean active;
     private final int covered;
 
@@ -27,13 +31,40 @@ class VerticalSlider extends View {
             BooleanSupplier allowed) {
         super(context);
         this.icon = context.getDrawable(iconRes).mutate();
+        this.baseIcon = iconRes;
+        this.shownIcon = iconRes;
         this.value = start;
         this.listener = listener;
         this.allowed = allowed;
         this.covered = Theme.onWhite(context);
     }
 
+    /** Ikon berbeda untuk nilai nol dan rendah. */
+    void levelIcons(int zero, int low) {
+        zeroIcon = zero;
+        lowIcon = low;
+        invalidate();
+    }
+
+    /** Ikuti perubahan dari luar, misalnya tombol volume fisik. */
+    void sync(float next) {
+        if (touching || Math.abs(next - value) < 0.004f) return;
+        if (animator != null) animator.cancel();
+        target = next;
+        animator = android.animation.ValueAnimator.ofFloat(value, next);
+        animator.setDuration(160);
+        animator.addUpdateListener(a -> { value = (float) a.getAnimatedValue(); invalidate(); });
+        animator.start();
+    }
+
     @Override protected void onDraw(Canvas c) {
+        if (zeroIcon != 0) {
+            int want = value <= 0.001f ? zeroIcon : value < 0.5f ? lowIcon : baseIcon;
+            if (want != shownIcon) {
+                shownIcon = want;
+                icon = getContext().getDrawable(want).mutate();
+            }
+        }
         float w = getWidth(), h = getHeight(), r = w / 2;
         clip.reset();
         clip.addRoundRect(new RectF(0, 0, w, h), r, r, Path.Direction.CW);
@@ -59,6 +90,12 @@ class VerticalSlider extends View {
         if (e.getAction() == MotionEvent.ACTION_DOWN) {
             active = allowed == null || allowed.getAsBoolean();
             getParent().requestDisallowInterceptTouchEvent(true);
+            touching = true;
+            if (animator != null) animator.cancel();
+        }
+        if (e.getAction() == MotionEvent.ACTION_UP
+                || e.getAction() == MotionEvent.ACTION_CANCEL) {
+            postDelayed(() -> touching = false, 250);
         }
         if (active && e.getAction() != MotionEvent.ACTION_CANCEL) {
             value = Math.max(0f, Math.min(1f, 1 - e.getY() / getHeight()));

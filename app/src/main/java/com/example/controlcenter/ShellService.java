@@ -14,6 +14,9 @@ public class ShellService extends IShell.Stub {
     @Override public int toggle(String target, boolean on) {
         String word = on ? "enable" : "disable";
         switch (target) {
+            case "headsup":
+                return exec("settings", "put", "global", "heads_up_notifications_enabled",
+                        on ? "1" : "0");
             case "wifi": return exec("svc", "wifi", word);
             case "data": return exec("svc", "data", word);
             case "nfc": return exec("svc", "nfc", word);

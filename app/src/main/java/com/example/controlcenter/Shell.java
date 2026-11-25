@@ -65,7 +65,7 @@ final class Shell {
         try {
             Shizuku.bindUserService(new Shizuku.UserServiceArgs(
                     new ComponentName(c.getPackageName(), ShellService.class.getName()))
-                    .daemon(false).processNameSuffix("shell").version(5), CONNECTION);
+                    .daemon(false).processNameSuffix("shell").version(12), CONNECTION);
         } catch (Throwable e) {
             if (WAITING.remove(job)) done.accept(false);
         }

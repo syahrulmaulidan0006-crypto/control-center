@@ -30,6 +30,7 @@ class Panel extends Sheet {
     private final int width, unit, gap;
     private final boolean land;
     private View connections;
+    private VerticalSlider light, sound;
     private FrameLayout expanded, popup;
     private boolean collapsing;
 
@@ -81,11 +82,47 @@ class Panel extends Sheet {
     @Override protected void onAttachedToWindow() {
         super.onAttachedToWindow();
         post(poll);
+        post(levels);
     }
 
     @Override protected void onDetachedFromWindow() {
         removeCallbacks(poll);
+        removeCallbacks(levels);
         super.onDetachedFromWindow();
+    }
+
+    private final Runnable levels = new Runnable() {
+        @Override public void run() {
+            syncLevels();
+            postDelayed(this, 150);
+        }
+    };
+
+    private void syncLevels() {
+        if (sound == null || light == null) return;
+        AudioManager audio = controls.audio;
+        sound.sync(audio.getStreamVolume(AudioManager.STREAM_MUSIC)
+                / (float) audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC));
+        light.sync(Math.min(1f, Settings.System.getInt(getContext().getContentResolver(),
+                Settings.System.SCREEN_BRIGHTNESS, 128) / 255f));
+    }
+
+    /** Tombol volume fisik langsung menggerakkan slider. */
+    @Override public boolean dispatchKeyEvent(android.view.KeyEvent e) {
+        int key = e.getKeyCode();
+        if (key == android.view.KeyEvent.KEYCODE_VOLUME_UP
+                || key == android.view.KeyEvent.KEYCODE_VOLUME_DOWN) {
+            if (e.getAction() == android.view.KeyEvent.ACTION_DOWN) {
+                try {
+                    controls.audio.adjustStreamVolume(AudioManager.STREAM_MUSIC,
+                            key == android.view.KeyEvent.KEYCODE_VOLUME_UP
+                                    ? AudioManager.ADJUST_RAISE : AudioManager.ADJUST_LOWER, 0);
+                } catch (SecurityException ignored) { }
+                syncLevels();
+            }
+            return true;
+        }
+        return super.dispatchKeyEvent(e);
     }
 
     private void refresh(boolean animate) {
@@ -188,7 +225,7 @@ class Panel extends Sheet {
 
         int bright = Settings.System.getInt(getContext().getContentResolver(),
                 Settings.System.SCREEN_BRIGHTNESS, 128);
-        VerticalSlider light = new VerticalSlider(getContext(), R.drawable.ic_sun,
+        light = new VerticalSlider(getContext(), R.drawable.ic_sun,
                 Math.min(1f, bright / 255f), value -> {
             if (!Settings.System.canWrite(getContext())) return;
             controls.put(Settings.System.SCREEN_BRIGHTNESS_MODE, 0);
@@ -200,13 +237,14 @@ class Panel extends Sheet {
 
         AudioManager audio = controls.audio;
         int max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
-        VerticalSlider sound = new VerticalSlider(getContext(), R.drawable.ic_volume,
+        sound = new VerticalSlider(getContext(), R.drawable.ic_volume,
                 audio.getStreamVolume(AudioManager.STREAM_MUSIC) / (float) max, value -> {
             try {
                 audio.setStreamVolume(AudioManager.STREAM_MUSIC, Math.round(value * max), 0);
             } catch (SecurityException e) { controls.toast("Izin Jangan Ganggu diperlukan"); }
         }, null);
         sound.setContentDescription("Volume");
+        sound.levelIcons(R.drawable.ic_volume0, R.drawable.ic_volume1);
         LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(unit, -1);
         p.leftMargin = gap;
         sliders.addView(sound, p);

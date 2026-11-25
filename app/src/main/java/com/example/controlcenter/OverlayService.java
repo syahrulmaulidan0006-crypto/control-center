@@ -47,6 +47,7 @@ public class OverlayService extends AccessibilityService {
     static final String REFRESH = "com.example.controlcenter.REFRESH";
     private final BroadcastReceiver refresh = new BroadcastReceiver() {
         @Override public void onReceive(Context c, Intent i) {
+            MusicListener.applyHints();
             removePanel();
             removeHandles();
             showHandles();
@@ -220,18 +221,20 @@ public class OverlayService extends AccessibilityService {
     }
 
     /** Tampilkan popup notifikasi bila keadaan layar memungkinkan. */
-    static void banner(StatusBarNotification note) {
-        if (instance != null) instance.showBanner(note);
+    static boolean banner(StatusBarNotification note) {
+        return instance != null && instance.showBanner(note);
     }
 
-    private void showBanner(StatusBarNotification note) {
-        if (!Prefs.is(this, "popup", true) || panel != null) return;
+    private boolean showBanner(StatusBarNotification note) {
+        if (!Prefs.is(this, "popup", true) || panel != null) return false;
         if (!getSystemService(PowerManager.class).isInteractive()
-                || getSystemService(KeyguardManager.class).isKeyguardLocked()) return;
-        if (Prefs.is(this, "hideFullscreen", true) && fullscreen()) return;
+                || getSystemService(KeyguardManager.class).isKeyguardLocked()) return false;
+        if (Prefs.is(this, "hideFullscreen", true) && fullscreen()) return false;
         // Jangan ganti popup yang sedang dipakai mengetik balasan.
         if (banner != null) {
-            if ((bannerParams.flags & WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE) == 0) return;
+            if ((bannerParams.flags & WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE) == 0) {
+                return false;
+            }
             removeBanner(banner);
         }
         Banner next = new Banner(this, note);
@@ -243,6 +246,7 @@ public class OverlayService extends AccessibilityService {
         wm.addView(next, bannerParams);
         banner = next;
         next.enter();
+        return true;
     }
 
     private boolean fullscreen() {
