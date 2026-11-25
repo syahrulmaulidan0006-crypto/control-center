@@ -59,8 +59,7 @@ class Panel extends FrameLayout {
         box = new LinearLayout(service);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setClipChildren(false);
-        buildConnections();
-        buildMusic();
+        buildTop();
         buildMiddle();
         buildShortcuts();
 
@@ -129,37 +128,43 @@ class Panel extends FrameLayout {
         box.addView(v, p);
     }
 
-    private void buildConnections() {
-        GridLayout card = new GridLayout(getContext());
-        card.setColumnCount(3);
-        card.setBackground(glass(0x30FFFFFF, 34));
-        card.setPadding(0, dp(8), 0, dp(8));
-        card.setClipChildren(false);
-        int size = Math.min(unit, dp(64));
-        Item[] list = {Item.AIRPLANE, Item.WIFI, Item.DATA,
-                Item.BLUETOOTH, Item.HOTSPOT, Item.LOCATION};
+    /** Baris atas: kotak koneksi dan kotak musik, dua persegi bersebelahan. */
+    private void buildTop() {
+        int side = unit * 2 + gap;
+        LinearLayout row = new LinearLayout(getContext());
+        row.setClipChildren(false);
+
+        GridLayout card = grid(2);
+        card.setBackground(glass(0x30FFFFFF, 32));
+        int pad = dp(6);
+        card.setPadding(pad, pad, pad, pad);
+        int cell = (side - pad * 2) / 2;
+        int size = Math.round(cell * 0.8f);
+        Item[] list = {Item.AIRPLANE, Item.WIFI, Item.DATA, Item.BLUETOOTH};
         for (Item item : list) {
-            FrameLayout cell = new FrameLayout(getContext());
-            cell.setClipChildren(false);
-            cell.addView(tile(item), new LayoutParams(size, size, Gravity.CENTER));
+            FrameLayout holder = new FrameLayout(getContext());
+            holder.setClipChildren(false);
+            holder.addView(tile(item), new LayoutParams(size, size, Gravity.CENTER));
             // Area kosong di sekitar tombol membesarkan kotak.
-            cell.setOnClickListener(v -> expand());
-            cell.setOnLongClickListener(v -> { expand(); return true; });
+            holder.setOnClickListener(v -> expand());
+            holder.setOnLongClickListener(v -> { expand(); return true; });
             GridLayout.LayoutParams p = new GridLayout.LayoutParams();
-            p.width = width / 3;
-            p.height = size + dp(18);
-            card.addView(cell, p);
+            p.width = cell;
+            p.height = cell;
+            card.addView(holder, p);
         }
         card.setOnClickListener(v -> expand());
         connections = card;
-        addSection(card, width, -2);
-    }
+        row.addView(card, new LinearLayout.LayoutParams(side, side));
 
-    private void buildMusic() {
-        addSection(new MusicCard(getContext(), () -> {
+        MusicCard music = new MusicCard(getContext(), side, () -> {
             controls.toast("Buka aplikasi dan berikan izin akses notifikasi");
             controls.launch(new android.content.Intent(getContext(), MainActivity.class));
-        }, service::closePanel), width, -2);
+        }, service::closePanel);
+        LinearLayout.LayoutParams m = new LinearLayout.LayoutParams(side, side);
+        m.leftMargin = gap;
+        row.addView(music, m);
+        addSection(row, width, side);
     }
 
     private void buildMiddle() {

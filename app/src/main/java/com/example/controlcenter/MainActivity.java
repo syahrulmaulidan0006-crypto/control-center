@@ -2,10 +2,12 @@ package com.example.controlcenter;
 
 import android.Manifest;
 import android.app.Activity;
+import android.content.ComponentName;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.PowerManager;
 import android.provider.Settings;
 import android.widget.Button;
 import android.widget.LinearLayout;
@@ -45,6 +47,25 @@ public class MainActivity extends Activity {
             } else {
                 requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION,
                         Manifest.permission.ACCESS_COARSE_LOCATION}, 1);
+            }
+        });
+
+        text(root, "\nAgar tetap aktif setelah aplikasi ditutup");
+        add(root, "6. Bebaskan dari penghemat baterai", () -> {
+            if (getSystemService(PowerManager.class)
+                    .isIgnoringBatteryOptimizations(getPackageName())) {
+                Toast.makeText(this, "Sudah dibebaskan", Toast.LENGTH_SHORT).show();
+            } else {
+                open(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, true);
+            }
+        });
+        add(root, "7. Mulai otomatis (Xiaomi/Redmi/POCO)", () -> {
+            try {
+                startActivity(new Intent().setComponent(new ComponentName(
+                        "com.miui.securitycenter",
+                        "com.miui.permcenter.autostart.AutoStartManagementActivity")));
+            } catch (Exception e) {
+                open(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, true);
             }
         });
 

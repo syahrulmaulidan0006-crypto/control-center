@@ -52,12 +52,15 @@ class MusicCard extends LinearLayout {
         }
     };
 
-    MusicCard(Context context, Runnable needPermission, Runnable closePanel) {
+    MusicCard(Context context, int side, Runnable needPermission, Runnable closePanel) {
         super(context);
         audio = context.getSystemService(AudioManager.class);
         sessions = context.getSystemService(MediaSessionManager.class);
         setOrientation(VERTICAL);
-        setPadding(dp(16), dp(16), dp(16), dp(8));
+        setPadding(dp(10), dp(12), dp(10), dp(6));
+        // Ukuran isi mengikuti sisi kotak.
+        int cover = Math.round(side * 0.30f);
+        int control = Math.min(dp(44), (side - dp(20)) / 3);
 
         LinearLayout top = new LinearLayout(context);
         top.setGravity(Gravity.CENTER_VERTICAL);
@@ -77,13 +80,13 @@ class MusicCard extends LinearLayout {
                 catch (Exception ignored) { }
             }
         });
-        top.addView(art, new LayoutParams(dp(64), dp(64)));
+        top.addView(art, new LayoutParams(cover, cover));
 
         LinearLayout info = new LinearLayout(context);
         info.setOrientation(VERTICAL);
-        info.setPadding(dp(14), 0, 0, 0);
-        title = line(17, Color.WHITE);
-        artist = line(14, 0xB3FFFFFF);
+        info.setPadding(dp(8), 0, 0, 0);
+        title = line(14, Color.WHITE);
+        artist = line(12, 0xB3FFFFFF);
         info.addView(title);
         info.addView(artist);
         top.addView(info, new LayoutParams(0, -2, 1));
@@ -106,15 +109,17 @@ class MusicCard extends LinearLayout {
                 }
             }
         });
-        addView(progress, new LayoutParams(-1, dp(30)));
+        progress.setPadding(dp(8), 0, dp(8), 0);
+        // Ruang sisa diisi garis progres agar kontrol menempel di bawah.
+        addView(progress, new LayoutParams(-1, 0, 1));
 
         LinearLayout buttons = new LinearLayout(context);
         buttons.setGravity(Gravity.CENTER);
-        button(buttons, R.drawable.ic_previous, "Sebelumnya", 48,
+        button(buttons, R.drawable.ic_previous, "Sebelumnya", control,
                 KeyEvent.KEYCODE_MEDIA_PREVIOUS);
-        play = button(buttons, R.drawable.ic_play, "Putar atau jeda", 56,
+        play = button(buttons, R.drawable.ic_play, "Putar atau jeda", control,
                 KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE);
-        button(buttons, R.drawable.ic_next, "Berikutnya", 48, KeyEvent.KEYCODE_MEDIA_NEXT);
+        button(buttons, R.drawable.ic_next, "Berikutnya", control, KeyEvent.KEYCODE_MEDIA_NEXT);
         addView(buttons, new LayoutParams(-1, -2));
         refresh();
     }
@@ -198,7 +203,7 @@ class MusicCard extends LinearLayout {
                 tint = (one.getPixel(0, 0) & 0x00FFFFFF) | 0x80000000;
             } catch (Exception ignored) { }
         } else {
-            art.setPadding(dp(16), dp(16), dp(16), dp(16));
+            art.setPadding(dp(10), dp(10), dp(10), dp(10));
             art.setBackgroundColor(0x38FFFFFF);
             art.setScaleType(ImageView.ScaleType.FIT_CENTER);
             art.setImageResource(R.drawable.ic_music);
@@ -232,11 +237,9 @@ class MusicCard extends LinearLayout {
         ImageView b = new ImageView(getContext());
         b.setImageResource(res);
         b.setContentDescription(label);
-        b.setPadding(dp(11), dp(11), dp(11), dp(11));
+        b.setPadding(size / 5, size / 5, size / 5, size / 5);
         b.setOnClickListener(v -> send(key));
-        LayoutParams p = new LayoutParams(dp(size), dp(size));
-        p.setMargins(dp(18), 0, dp(18), 0);
-        row.addView(b, p);
+        row.addView(b, new LayoutParams(size, size));
         return b;
     }
 

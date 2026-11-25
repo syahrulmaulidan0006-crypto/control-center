@@ -18,12 +18,15 @@
         <package android:name="com.google.ar.lens" />
         <package android:name="moe.shizuku.privileged.api" />
     </queries>
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-feature android:name="android.hardware.camera.flash" android:required="false" />
 
     <application android:label="@string/app_name"
         android:icon="@android:drawable/ic_menu_manage"
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
-        <activity android:name=".MainActivity" android:exported="true">
+        <!-- Tidak muncul di aplikasi terbaru agar tidak ikut tersapu saat dibersihkan. -->
+        <activity android:name=".MainActivity" android:exported="true"
+            android:excludeFromRecents="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
