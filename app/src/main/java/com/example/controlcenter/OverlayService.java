@@ -194,6 +194,11 @@ public class OverlayService extends AccessibilityService {
                 tracker[0].recycle();
                 tracker[0] = null;
                 if (active[0]) { if (open) openFully(); else closePanel(); }
+                // Geseran sangat cepat bisa tiba tanpa kejadian gerak sama sekali.
+                else if (a == MotionEvent.ACTION_UP && dy > dp(40)) {
+                    addPanel(left);
+                    openFully();
+                }
             }
             return true;
         });
