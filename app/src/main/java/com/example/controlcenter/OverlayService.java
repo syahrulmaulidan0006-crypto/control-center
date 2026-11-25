@@ -78,10 +78,11 @@ public class OverlayService extends AccessibilityService {
     private void keepAlive() {
         try {
             getSystemService(NotificationManager.class).createNotificationChannel(
-                    new NotificationChannel("cc", "Control Center",
-                            NotificationManager.IMPORTANCE_MIN));
-            Notification n = new Notification.Builder(this, "cc")
+                    new NotificationChannel("aktif", "Control Center aktif",
+                            NotificationManager.IMPORTANCE_LOW));
+            Notification n = new Notification.Builder(this, "aktif")
                     .setContentTitle("Control Center aktif")
+                    .setOngoing(true)
                     .setSmallIcon(R.drawable.ic_settings)
                     .setContentIntent(PendingIntent.getActivity(this, 0,
                             new Intent(this, MainActivity.class),
@@ -234,8 +235,9 @@ public class OverlayService extends AccessibilityService {
             removeBanner(banner);
         }
         Banner next = new Banner(this, note);
-        bannerParams = params(-1, -2, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE);
-        bannerParams.gravity = Gravity.TOP;
+        bannerParams = params(Math.min(getResources().getDisplayMetrics().widthPixels, dp(440)),
+                -2, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE);
+        bannerParams.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
         int id = getResources().getIdentifier("status_bar_height", "dimen", "android");
         bannerParams.y = id > 0 ? getResources().getDimensionPixelSize(id) : dp(28);
         wm.addView(next, bannerParams);

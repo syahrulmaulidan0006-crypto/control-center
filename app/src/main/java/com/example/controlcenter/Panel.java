@@ -28,6 +28,7 @@ class Panel extends Sheet {
     private final List<TextView> states = new ArrayList<>();
     private final List<Item> stateItems = new ArrayList<>();
     private final int width, unit, gap;
+    private final boolean land;
     private View connections;
     private FrameLayout expanded, popup;
     private boolean collapsing;
@@ -43,21 +44,29 @@ class Panel extends Sheet {
         super(service);
         this.controls = controls;
         DisplayMetrics screen = getResources().getDisplayMetrics();
-        gap = dp(14);
-        int max = Math.min(Math.min(screen.widthPixels - dp(44), dp(400)),
-                Math.max(dp(280), screen.heightPixels));
-        unit = (max - 3 * gap) / 4;
-        width = unit * 4 + gap * 3;
+        // Layar mendatar (mode game): tiga kolom yang pas tanpa perlu digulir.
+        land = screen.widthPixels > screen.heightPixels;
+        gap = dp(land ? 10 : 14);
+        if (land) {
+            unit = Math.min((screen.heightPixels - dp(40) - 4 * gap) / 4,
+                    (screen.widthPixels - dp(80) - 8 * gap) / 8);
+            width = unit * 8 + gap * 8;
+        } else {
+            int max = Math.min(screen.widthPixels - dp(44), dp(400));
+            int cell = (max - 3 * gap) / 4;
+            unit = cell;
+            width = cell * 4 + gap * 3;
+        }
 
         box = new LinearLayout(service);
-        box.setOrientation(LinearLayout.VERTICAL);
+        box.setOrientation(land ? LinearLayout.HORIZONTAL : LinearLayout.VERTICAL);
         box.setClipChildren(false);
         buildTop();
         buildMiddle();
         buildShortcuts();
 
         FrameLayout wrap = new FrameLayout(service);
-        wrap.setPadding(0, dp(44), 0, dp(40));
+        wrap.setPadding(0, dp(land ? 20 : 44), 0, dp(land ? 10 : 40));
         wrap.setClipChildren(false);
         wrap.addView(box, new LayoutParams(width, -2, Gravity.CENTER));
         wrap.setOnClickListener(v -> service.closePanel());
@@ -109,7 +118,8 @@ class Panel extends Sheet {
 
     private void addSection(View v, int w, int h) {
         LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(w, h);
-        p.bottomMargin = gap;
+        if (land) p.rightMargin = box.getChildCount() < 2 ? gap : 0;
+        else p.bottomMargin = gap;
         box.addView(v, p);
     }
 
@@ -117,6 +127,7 @@ class Panel extends Sheet {
     private void buildTop() {
         int side = unit * 2 + gap;
         LinearLayout row = new LinearLayout(getContext());
+        row.setOrientation(land ? LinearLayout.VERTICAL : LinearLayout.HORIZONTAL);
         row.setClipChildren(false);
 
         GridLayout card = grid(2);
@@ -147,18 +158,33 @@ class Panel extends Sheet {
             controls.launch(new android.content.Intent(getContext(), MainActivity.class));
         }, service::closePanel);
         LinearLayout.LayoutParams m = new LinearLayout.LayoutParams(side, side);
-        m.leftMargin = gap;
+        if (land) m.topMargin = gap; else m.leftMargin = gap;
         row.addView(music, m);
-        addSection(row, width, side);
+        if (land) addSection(row, side, side * 2 + gap);
+        else addSection(row, width, side);
     }
 
     private void buildMiddle() {
         LinearLayout row = new LinearLayout(getContext());
         row.setClipChildren(false);
+        LinearLayout sliders = row;
         GridLayout grid = grid(2);
         Item[] list = {Item.ROTATION, Item.DND, Item.TORCH, Item.VIBRATE};
         for (int i = 0; i < list.length; i++) cell(grid, tile(list[i]), i < 2 ? gap : 0);
-        row.addView(grid, new LinearLayout.LayoutParams(unit * 2 + gap * 2, -1));
+        if (land) {
+            row.setOrientation(LinearLayout.VERTICAL);
+            // Kolom kanan kisi tidak memakai jarak tambahan.
+            for (int i = 1; i < grid.getChildCount(); i += 2) {
+                ((GridLayout.LayoutParams) grid.getChildAt(i).getLayoutParams()).rightMargin = 0;
+            }
+            row.addView(grid, new LinearLayout.LayoutParams(-2, unit * 2 + gap));
+            sliders = new LinearLayout(getContext());
+            LinearLayout.LayoutParams under = new LinearLayout.LayoutParams(-1, unit * 2 + gap);
+            under.topMargin = gap;
+            row.addView(sliders, under);
+        } else {
+            row.addView(grid, new LinearLayout.LayoutParams(unit * 2 + gap * 2, -1));
+        }
 
         int bright = Settings.System.getInt(getContext().getContentResolver(),
                 Settings.System.SCREEN_BRIGHTNESS, 128);
@@ -170,7 +196,7 @@ class Panel extends Sheet {
                     Math.max(1, Math.round(value * 255)));
         }, controls::canWrite);
         light.setContentDescription("Kecerahan");
-        row.addView(light, new LinearLayout.LayoutParams(unit, -1));
+        sliders.addView(light, new LinearLayout.LayoutParams(unit, -1));
 
         AudioManager audio = controls.audio;
         int max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
@@ -183,8 +209,9 @@ class Panel extends Sheet {
         sound.setContentDescription("Volume");
         LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(unit, -1);
         p.leftMargin = gap;
-        row.addView(sound, p);
-        addSection(row, width, unit * 2 + gap);
+        sliders.addView(sound, p);
+        if (land) addSection(row, unit * 2 + gap, unit * 4 + gap * 3);
+        else addSection(row, width, unit * 2 + gap);
     }
 
     private void buildShortcuts() {
@@ -193,7 +220,7 @@ class Panel extends Sheet {
         for (int i = Item.CALCULATOR.ordinal(); i < all.length; i++) {
             cell(grid, tile(all[i]), gap);
         }
-        addSection(grid, width + gap, -2);
+        addSection(grid, land ? unit * 4 + gap * 4 : width + gap, -2);
     }
 
     private GridLayout grid(int columns) {
@@ -229,7 +256,9 @@ class Panel extends Sheet {
         FrameLayout layer = new FrameLayout(getContext());
         layer.setOnClickListener(v -> collapse());
         GridLayout card = new GridLayout(getContext());
-        card.setColumnCount(2);
+        int columns = land ? 3 : 2;
+        int wide = Math.min(width, dp(land ? 480 : 400));
+        card.setColumnCount(columns);
         card.setBackground(new Glass(getContext(), 40, 0x33FFFFFF));
         card.setPadding(dp(8), dp(16), dp(8), dp(16));
         card.setClickable(true);
@@ -238,7 +267,7 @@ class Panel extends Sheet {
         Item[] list = {Item.AIRPLANE, Item.WIFI, Item.DATA,
                 Item.BLUETOOTH, Item.HOTSPOT, Item.LOCATION};
         int rowHeight = Math.min(dp(132),
-                (getHeight() - dp(80)) / 3);
+                (getHeight() - dp(80)) / (6 / columns));
         for (Item item : list) {
             LinearLayout cell = new LinearLayout(getContext());
             cell.setOrientation(LinearLayout.VERTICAL);
@@ -254,12 +283,12 @@ class Panel extends Sheet {
             states.add(state);
             stateItems.add(item);
             GridLayout.LayoutParams p = new GridLayout.LayoutParams();
-            p.width = (width - dp(16)) / 2;
+            p.width = (wide - dp(16)) / columns;
             p.height = rowHeight;
             card.addView(cell, p);
         }
         layer.setTag(first);
-        layer.addView(card, new LayoutParams(width, -2, Gravity.CENTER));
+        layer.addView(card, new LayoutParams(wide, -2, Gravity.CENTER));
         expanded = layer;
         addView(layer, new LayoutParams(-1, -1));
         refresh(false);
@@ -322,7 +351,8 @@ class Panel extends Sheet {
 
     private void showPicker(Item item) {
         if (popup != null) return;
-        popup = new Picker(getContext(), controls, item, width, this::closePicker);
+        popup = new Picker(getContext(), controls, item, Math.min(width, dp(400)),
+                this::closePicker);
         addView(popup, new LayoutParams(-1, -1));
         View behind = expanded != null ? expanded : scroll;
         blur(behind, true);
@@ -369,7 +399,7 @@ class Panel extends Sheet {
             box.getChildAt(i).setTranslationY(-away * dp(70 + i * 34));
         }
         float scale = 0.92f + 0.08f * shown;
-        box.setPivotX(width / 2f);
+        box.setPivotX(box.getWidth() / 2f);
         box.setPivotY(0);
         box.setScaleX(scale);
         box.setScaleY(scale);

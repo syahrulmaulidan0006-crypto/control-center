@@ -4,6 +4,7 @@ import android.Manifest;
 import android.app.Activity;
 import android.app.ActivityManager;
 import android.app.AlertDialog;
+import android.app.ApplicationExitInfo;
 import android.app.NotificationManager;
 import android.content.ComponentName;
 import android.content.Intent;
@@ -23,7 +24,10 @@ import android.widget.ScrollView;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
+import java.util.Locale;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -49,6 +53,10 @@ public class MainActivity extends Activity {
         setContentView(scroll);
         Shizuku.addRequestPermissionResultListener(result);
         Shizuku.addBinderReceivedListenerSticky(binder);
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(
+                Manifest.permission.POST_NOTIFICATIONS) != 0) {
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 3);
+        }
     }
 
     @Override protected void onResume() {
@@ -112,6 +120,14 @@ public class MainActivity extends Activity {
             }
         });
 
+        status("Notifikasi \"Control Center aktif\"",
+                getSystemService(NotificationManager.class).areNotificationsEnabled(),
+                () -> startActivity(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName())));
+        note("Penting di Xiaomi: buka layar aplikasi terbaru, tekan lama kartu Control "
+                + "Center, lalu ketuk ikon gembok agar tidak ikut dibersihkan.");
+        if (Build.VERSION.SDK_INT >= 30) history();
+
         title("Warna tombol", 20);
         colors();
 
@@ -150,6 +166,38 @@ public class MainActivity extends Activity {
             if (OverlayService.class.getName().equals(s.service.getClassName())) return true;
         }
         return false;
+    }
+
+    /** Catatan dari sistem tentang mengapa proses layanan terakhir dihentikan. */
+    @android.annotation.TargetApi(30)
+    private void history() {
+        title("Riwayat layanan berhenti", 20);
+        int shown = 0;
+        for (ApplicationExitInfo e : getSystemService(ActivityManager.class)
+                .getHistoricalProcessExitReasons(getPackageName(), 0, 30)) {
+            if (!getPackageName().equals(e.getProcessName())) continue;
+            String when = new SimpleDateFormat("d MMM HH:mm", new Locale("id"))
+                    .format(new Date(e.getTimestamp()));
+            note(when + ": " + reason(e.getReason()) + " (kode " + e.getReason() + ")"
+                    + (e.getDescription() == null ? "" : "\n" + e.getDescription()));
+            if (++shown == 3) break;
+        }
+        if (shown == 0) note("Belum ada catatan");
+    }
+
+    @android.annotation.TargetApi(30)
+    private String reason(int code) {
+        switch (code) {
+            case ApplicationExitInfo.REASON_USER_REQUESTED: return "Dihentikan pengguna/sistem";
+            case ApplicationExitInfo.REASON_USER_STOPPED: return "Pengguna dihentikan";
+            case ApplicationExitInfo.REASON_LOW_MEMORY: return "Memori penuh";
+            case ApplicationExitInfo.REASON_CRASH:
+            case ApplicationExitInfo.REASON_CRASH_NATIVE: return "Aplikasi error";
+            case ApplicationExitInfo.REASON_ANR: return "Aplikasi tidak merespons";
+            case ApplicationExitInfo.REASON_SIGNALED: return "Dimatikan sistem";
+            case ApplicationExitInfo.REASON_PERMISSION_CHANGE: return "Izin berubah";
+            default: return "Lainnya";
+        }
     }
 
     private void permissions() {

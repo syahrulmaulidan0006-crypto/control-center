@@ -51,8 +51,10 @@ class Banner extends FrameLayout {
         if (leaving) return;
         leaving = true;
         removeCallbacks(timeout);
-        card.animate().translationY(-dp(220)).alpha(0).setDuration(220)
-                .withEndAction(() -> service.removeBanner(this)).start();
+        card.animate().translationY(-dp(220)).alpha(0).setDuration(220).start();
+        // Dihapus dengan penjadwalan sendiri, tidak bergantung pada akhir animasi.
+        new android.os.Handler(android.os.Looper.getMainLooper())
+                .postDelayed(() -> service.removeBanner(this), 260);
     }
 
     /** Jangan tutup otomatis selagi disentuh. */
@@ -68,6 +70,8 @@ class Banner extends FrameLayout {
         if (expanded) return;
         expanded = true;
         removeCallbacks(timeout);
+        // Popup yang dibiarkan terbuka tetap ditutup agar tidak menahan popup berikutnya.
+        postDelayed(timeout, 30000);
         card.removeViewAt(card.getChildCount() - 1);
         card.body.setMaxLines(8);
         Notification.Action reply = Notes.replyAction(note);

@@ -76,7 +76,9 @@ class Picker extends FrameLayout {
         ScrollView scroll = new ScrollView(context) {
             @Override protected void onMeasure(int w, int h) {
                 super.onMeasure(w, MeasureSpec.makeMeasureSpec(
-                        getResources().getDisplayMetrics().heightPixels * 2 / 5,
+                        getResources().getDisplayMetrics().heightPixels
+                                * 2 / (getResources().getDisplayMetrics().heightPixels
+                                < dp(500) ? 6 : 5),
                         MeasureSpec.AT_MOST));
             }
         };

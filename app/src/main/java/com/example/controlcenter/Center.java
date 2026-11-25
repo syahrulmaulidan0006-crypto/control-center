@@ -35,24 +35,34 @@ class Center extends Sheet {
     Center(OverlayService service, Controls controls) {
         super(service);
         this.controls = controls;
-        int width = Math.min(getResources().getDisplayMetrics().widthPixels - dp(28), dp(430));
+        android.util.DisplayMetrics screen = getResources().getDisplayMetrics();
+        boolean land = screen.widthPixels > screen.heightPixels;
+        int width = land ? Math.min(screen.widthPixels - dp(200), dp(720))
+                : Math.min(screen.widthPixels - dp(28), dp(430));
 
         box = new LinearLayout(service);
-        box.setOrientation(LinearLayout.VERTICAL);
+        box.setOrientation(land ? LinearLayout.HORIZONTAL : LinearLayout.VERTICAL);
+        LinearLayout clocks = box;
+        if (land) {
+            clocks = new LinearLayout(service);
+            clocks.setOrientation(LinearLayout.VERTICAL);
+            box.addView(clocks, new LinearLayout.LayoutParams(0, -2, 2));
+        }
 
         TextClock date = clock("EEEE, d MMMM", 16);
-        box.addView(date);
-        TextClock time = clock("HH:mm", 82);
+        clocks.addView(date);
+        TextClock time = clock("HH:mm", land ? 60 : 82);
         time.setFormat12Hour("h:mm");
         time.setTypeface(Typeface.create("sans-serif-thin", Typeface.NORMAL));
-        box.addView(time);
+        clocks.addView(time);
 
         list = new LinearLayout(service);
         list.setOrientation(LinearLayout.VERTICAL);
-        box.addView(list, new LinearLayout.LayoutParams(-1, -2));
+        box.addView(list, land ? new LinearLayout.LayoutParams(0, -2, 3)
+                : new LinearLayout.LayoutParams(-1, -2));
 
         FrameLayout wrap = new FrameLayout(service);
-        wrap.setPadding(0, dp(48), 0, dp(120));
+        wrap.setPadding(0, dp(land ? 20 : 48), 0, dp(land ? 30 : 120));
         wrap.addView(box, new FrameLayout.LayoutParams(width, -2, Gravity.CENTER_HORIZONTAL));
         wrap.setOnClickListener(v -> service.closePanel());
         scroll = new ScrollView(service);

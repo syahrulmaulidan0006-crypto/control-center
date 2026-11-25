@@ -62,12 +62,14 @@ public class MusicListener extends NotificationListenerService {
         if (!visible(n)) return;
         String now = signature(n);
         String before = seen.put(n.getKey(), now);
+        if (now.equals(before)) return;
+        // Pesan baru memperbarui notifikasi yang sama, jadi tetap harus muncul.
         boolean once = (n.getNotification().flags & Notification.FLAG_ONLY_ALERT_ONCE) != 0;
-        if (now.equals(before) || (before != null && once)) return;
+        if (before != null && once && !message(n)) return;
         if (Prefs.blocked(this).contains(n.getPackageName())) return;
         Ranking ranking = new Ranking();
         if (getCurrentRanking().getRanking(n.getKey(), ranking)
-                && ranking.getImportance() < NotificationManager.IMPORTANCE_DEFAULT) return;
+                && ranking.getImportance() < NotificationManager.IMPORTANCE_LOW) return;
         if (getCurrentInterruptionFilter() != INTERRUPTION_FILTER_ALL) return;
         playSound();
         main.post(() -> OverlayService.banner(n));
@@ -89,7 +91,17 @@ public class MusicListener extends NotificationListenerService {
     }
 
     private static String signature(StatusBarNotification n) {
-        return Notes.title(n) + "|" + Notes.text(n, Notification.EXTRA_TEXT);
+        Notification v = n.getNotification();
+        Object[] messages = (Object[]) v.extras.getParcelableArray(Notification.EXTRA_MESSAGES);
+        return Notes.title(n) + "|" + Notes.text(n, Notification.EXTRA_TEXT) + "|"
+                + (messages == null ? 0 : messages.length) + "|" + (message(n) ? v.when : 0);
+    }
+
+    private static boolean message(StatusBarNotification n) {
+        Notification v = n.getNotification();
+        return Notification.CATEGORY_MESSAGE.equals(v.category)
+                || v.extras.containsKey(Notification.EXTRA_MESSAGES)
+                || Notes.replyAction(n) != null;
     }
 
     /** Hanya notifikasi biasa: bukan musik, proses berjalan, atau ringkasan grup. */
