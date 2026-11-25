@@ -32,6 +32,9 @@ public class MainActivity extends Activity {
         add(root, "3. Izin Jangan Ganggu",
                 () -> open(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS, false));
 
+        add(root, "4. Izin akses notifikasi (sinkron musik)",
+                () -> open(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS, false));
+
         ScrollView scroll = new ScrollView(this);
         scroll.addView(root);
         setContentView(scroll);

@@ -1,19 +1,15 @@
 package com.example.controlcenter;
 
 import android.accessibilityservice.AccessibilityService;
-import android.graphics.Typeface;
 import android.net.ConnectivityManager;
 import android.net.wifi.WifiManager;
-import android.os.BatteryManager;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.GridLayout;
 import android.widget.ImageView;
 import android.widget.ScrollView;
-import android.widget.TextClock;
 import android.app.NotificationManager;
 import android.content.Intent;
 import android.content.res.Configuration;
-import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.GradientDrawable;
 import android.hardware.camera2.CameraCharacteristics;
@@ -25,6 +21,7 @@ import android.os.Looper;
 import android.provider.AlarmClock;
 import android.provider.MediaStore;
 import android.provider.Settings;
+import android.util.DisplayMetrics;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
@@ -33,12 +30,11 @@ import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
-import android.widget.TextView;
 import android.widget.Toast;
 
 public class OverlayService extends AccessibilityService {
     /** Gelap latar: 00 = bening penuh, FF = pekat. */
-    private static final int BACKGROUND = 0x40000000;
+    private static final int BACKGROUND = 0x59000000;
     /** Warna kartu kaca. */
     private static final int GLASS = 0x38FFFFFF;
     private static final int ACCENT = 0xFF2F8CFF;
@@ -147,55 +143,42 @@ public class OverlayService extends AccessibilityService {
         };
         back.setBackgroundColor(BACKGROUND);
 
-        int screen = getResources().getDisplayMetrics().widthPixels;
-        int width = Math.min(screen - dp(40), dp(360));
-        int gap = dp(12);
-        int unit = (width - 3 * gap) / 4;
+        DisplayMetrics screen = getResources().getDisplayMetrics();
+        int width = Math.min(screen.widthPixels - dp(44), dp(400));
+        int gap = dp(14);
+        // Ukuran tombol mengikuti lebar layar, tetapi tetap muat secara tinggi.
+        int byHeight = (screen.heightPixels - dp(290)) / 5 - gap;
+        int unit = Math.max(dp(52), Math.min((width - 3 * gap) / 4, byHeight));
+        width = unit * 4 + gap * 3;
 
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setClickable(true);
 
-        header(box);
+        // Kartu musik
+        MusicCard music = new MusicCard(this, () -> {
+            toast("Buka aplikasi dan berikan izin nomor 4");
+            launch(new Intent(this, MainActivity.class));
+        }, this::hidePanel);
+        LinearLayout.LayoutParams card = new LinearLayout.LayoutParams(width, -2);
+        card.bottomMargin = gap;
+        box.addView(music, card);
 
-        // Kartu koneksi
-        LinearLayout net = card(box, width, LinearLayout.HORIZONTAL, gap);
-        net.setPadding(0, dp(14), 0, dp(10));
+        // Baris koneksi
+        GridLayout net = grid(box, width, gap);
         boolean airplane = Settings.Global.getInt(getContentResolver(),
                 Settings.Global.AIRPLANE_MODE_ON, 0) == 1;
         boolean bluetooth = Settings.Global.getInt(getContentResolver(), "bluetooth_on", 0) == 1;
         WifiManager wifi = getApplicationContext().getSystemService(WifiManager.class);
         boolean online = getSystemService(ConnectivityManager.class).getActiveNetwork() != null;
-        labelled(net, R.drawable.ic_airplane, "Pesawat", airplane, 0xFFFF9F43,
+        toggle(net, R.drawable.ic_airplane, "Mode pesawat", unit, gap, airplane, 0xFFFF9F43,
                 v -> launch(new Intent(Settings.ACTION_AIRPLANE_MODE_SETTINGS)));
-        labelled(net, R.drawable.ic_wifi, "Wi-Fi", wifi.isWifiEnabled(), ACCENT,
+        toggle(net, R.drawable.ic_wifi, "Wi-Fi", unit, gap, wifi.isWifiEnabled(), ACCENT,
                 v -> launch(new Intent(Settings.Panel.ACTION_WIFI)));
-        labelled(net, R.drawable.ic_internet, "Internet", online, 0xFF2ECC87,
+        toggle(net, R.drawable.ic_internet, "Internet", unit, gap, online, 0xFF2ECC71,
                 v -> launch(new Intent(Settings.Panel.ACTION_INTERNET_CONNECTIVITY)));
-        labelled(net, R.drawable.ic_bluetooth, "Bluetooth", bluetooth, ACCENT,
+        toggle(net, R.drawable.ic_bluetooth, "Bluetooth", unit, gap, bluetooth, ACCENT,
                 v -> launch(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS)));
-
-        // Kartu musik
-        LinearLayout music = card(box, width, LinearLayout.VERTICAL, gap);
-        music.setPadding(dp(18), dp(12), dp(18), dp(10));
-        TextView status = text(audio.isMusicActive() ? "Sedang diputar" : "Tidak ada musik", 14, 1f);
-        status.setGravity(Gravity.CENTER);
-        music.addView(status, new LinearLayout.LayoutParams(-1, -2));
-        LinearLayout controls = new LinearLayout(this);
-        controls.setGravity(Gravity.CENTER);
-        music.addView(controls, new LinearLayout.LayoutParams(-1, dp(56)));
-        transport(controls, R.drawable.ic_previous, v -> media(KeyEvent.KEYCODE_MEDIA_PREVIOUS));
-        ImageView play = transport(controls,
-                audio.isMusicActive() ? R.drawable.ic_pause : R.drawable.ic_play, null);
-        play.setOnClickListener(v -> {
-            media(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE);
-            play.postDelayed(() -> {
-                boolean active = audio.isMusicActive();
-                play.setImageResource(active ? R.drawable.ic_pause : R.drawable.ic_play);
-                status.setText(active ? "Sedang diputar" : "Tidak ada musik");
-            }, 600);
-        });
-        transport(controls, R.drawable.ic_next, v -> media(KeyEvent.KEYCODE_MEDIA_NEXT));
 
         // Tombol 2x2 dan dua slider vertikal
         LinearLayout middle = new LinearLayout(this);
@@ -224,8 +207,16 @@ public class OverlayService extends AccessibilityService {
             catch (Exception e) { toast("Kamera sedang dipakai"); }
         });
 
-        round(grid, R.drawable.ic_timer, "Alarm", unit, gap, 3).setOnClickListener(
-                v -> launch(new Intent(AlarmClock.ACTION_SHOW_ALARMS)));
+        ImageView ring = round(grid, R.drawable.ic_bell, "Mode getar", unit, gap, 3);
+        paint(ring, audio.getRingerMode() != AudioManager.RINGER_MODE_NORMAL, 0xFFFF5C6C);
+        ring.setOnClickListener(v -> {
+            boolean normal = audio.getRingerMode() == AudioManager.RINGER_MODE_NORMAL;
+            try {
+                audio.setRingerMode(normal ? AudioManager.RINGER_MODE_VIBRATE
+                        : AudioManager.RINGER_MODE_NORMAL);
+                paint(v, normal, 0xFFFF5C6C);
+            } catch (SecurityException e) { toast("Izin Jangan Ganggu diperlukan"); }
+        });
 
         int bright = Settings.System.getInt(getContentResolver(),
                 Settings.System.SCREEN_BRIGHTNESS, 128);
@@ -252,25 +243,36 @@ public class OverlayService extends AccessibilityService {
         sp.leftMargin = gap;
         middle.addView(sound, sp);
 
-        // Baris pintasan
-        GridLayout bottom = new GridLayout(this);
-        bottom.setColumnCount(4);
-        box.addView(bottom, new LinearLayout.LayoutParams(width + gap, -2));
-        round(bottom, R.drawable.ic_calculator, "Kalkulator", unit, gap, 0).setOnClickListener(
+        // Dua baris pintasan
+        GridLayout bottom = grid(box, width, gap);
+        action(bottom, R.drawable.ic_calculator, "Kalkulator", unit, gap,
                 v -> launch(Intent.makeMainSelectorActivity(
                         Intent.ACTION_MAIN, Intent.CATEGORY_APP_CALCULATOR)));
-        round(bottom, R.drawable.ic_camera, "Kamera", unit, gap, 1).setOnClickListener(
+        action(bottom, R.drawable.ic_camera, "Kamera", unit, gap,
                 v -> launch(new Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)));
-        round(bottom, R.drawable.ic_settings, "Pengaturan", unit, gap, 2).setOnClickListener(
+        action(bottom, R.drawable.ic_timer, "Alarm", unit, gap,
+                v -> launch(new Intent(AlarmClock.ACTION_SHOW_ALARMS)));
+        action(bottom, R.drawable.ic_screenshot, "Tangkapan layar", unit, gap, v -> {
+            hidePanel();
+            new Handler(Looper.getMainLooper()).postDelayed(
+                    () -> performGlobalAction(GLOBAL_ACTION_TAKE_SCREENSHOT), 600);
+        });
+        action(bottom, R.drawable.ic_battery, "Penghemat baterai", unit, gap,
+                v -> launch(new Intent(Settings.ACTION_BATTERY_SAVER_SETTINGS)));
+        action(bottom, R.drawable.ic_settings, "Pengaturan", unit, gap,
                 v -> launch(new Intent(Settings.ACTION_SETTINGS)));
-        round(bottom, R.drawable.ic_lock, "Kunci layar", unit, gap, 3).setOnClickListener(v -> {
+        action(bottom, R.drawable.ic_lock, "Kunci layar", unit, gap, v -> {
             hidePanel();
             performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN);
+        });
+        action(bottom, R.drawable.ic_power, "Menu daya", unit, gap, v -> {
+            hidePanel();
+            performGlobalAction(GLOBAL_ACTION_POWER_DIALOG);
         });
 
         // Ketuk area kosong atau geser ke atas untuk menutup.
         FrameLayout wrap = new FrameLayout(this);
-        wrap.setPadding(0, dp(48), 0, dp(32));
+        wrap.setPadding(0, dp(36), 0, dp(24));
         wrap.addView(box, new FrameLayout.LayoutParams(width, -2, Gravity.CENTER));
         final float[] startY = new float[1];
         wrap.setOnTouchListener((v, e) -> {
@@ -316,51 +318,11 @@ public class OverlayService extends AccessibilityService {
         torchTile = null;
     }
 
-    private TextView text(String value, int size, float alpha) {
-        TextView t = new TextView(this);
-        t.setText(value);
-        t.setTextColor(Color.WHITE);
-        t.setTextSize(size);
-        t.setAlpha(alpha);
-        return t;
-    }
-
-    private void header(LinearLayout box) {
-        LinearLayout head = new LinearLayout(this);
-        head.setGravity(Gravity.BOTTOM);
-        head.setPadding(dp(6), 0, dp(6), dp(16));
-
-        LinearLayout time = new LinearLayout(this);
-        time.setOrientation(LinearLayout.VERTICAL);
-        TextClock clock = new TextClock(this);
-        clock.setFormat12Hour("h:mm");
-        clock.setFormat24Hour("HH:mm");
-        clock.setTextColor(Color.WHITE);
-        clock.setTextSize(42);
-        clock.setTypeface(Typeface.create("sans-serif-light", Typeface.NORMAL));
-        time.addView(clock);
-        TextClock date = new TextClock(this);
-        date.setFormat12Hour("EEEE, d MMMM");
-        date.setFormat24Hour("EEEE, d MMMM");
-        date.setTextColor(0xCCFFFFFF);
-        date.setTextSize(13);
-        time.addView(date);
-        head.addView(time, new LinearLayout.LayoutParams(0, -2, 1));
-
-        int level = getSystemService(BatteryManager.class)
-                .getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY);
-        head.addView(text("Baterai " + level + "%", 13, 0.85f));
-        box.addView(head, new LinearLayout.LayoutParams(-1, -2));
-    }
-
-    private LinearLayout card(LinearLayout parent, int width, int orientation, int gap) {
-        LinearLayout c = new LinearLayout(this);
-        c.setOrientation(orientation);
-        c.setBackground(shape(GLASS, 28));
-        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(width, -2);
-        p.bottomMargin = gap;
-        parent.addView(c, p);
-        return c;
+    private GridLayout grid(LinearLayout parent, int width, int gap) {
+        GridLayout g = new GridLayout(this);
+        g.setColumnCount(4);
+        parent.addView(g, new LinearLayout.LayoutParams(width + gap, -2));
+        return g;
     }
 
     private ImageView icon(int res, String label, int size, int padding) {
@@ -373,38 +335,27 @@ public class OverlayService extends AccessibilityService {
         return i;
     }
 
-    private void labelled(LinearLayout row, int res, String label, boolean on, int color,
-            View.OnClickListener click) {
-        LinearLayout item = new LinearLayout(this);
-        item.setOrientation(LinearLayout.VERTICAL);
-        item.setGravity(Gravity.CENTER_HORIZONTAL);
-        ImageView i = icon(res, label, dp(52), dp(14));
+    private void toggle(GridLayout grid, int res, String label, int size, int gap, boolean on,
+            int color, View.OnClickListener click) {
+        ImageView i = action(grid, res, label, size, gap, click);
         paint(i, on, color);
-        i.setOnClickListener(click);
-        item.addView(i);
-        TextView t = text(label, 11, 0.85f);
-        t.setPadding(0, dp(6), 0, 0);
-        item.addView(t);
-        row.addView(item, new LinearLayout.LayoutParams(0, -2, 1));
     }
 
-    private ImageView transport(LinearLayout row, int res, View.OnClickListener click) {
-        ImageView i = icon(res, "Kontrol musik", dp(56), dp(14));
+    private ImageView action(GridLayout grid, int res, String label, int size, int gap,
+            View.OnClickListener click) {
+        ImageView i = round(grid, res, label, size, gap, grid.getChildCount());
         i.setOnClickListener(click);
-        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(dp(56), dp(56));
-        p.setMargins(dp(16), 0, dp(16), 0);
-        row.addView(i, p);
         return i;
     }
 
     private ImageView round(GridLayout grid, int res, String label, int size, int gap, int index) {
-        ImageView i = icon(res, label, size, size * 3 / 10);
+        ImageView i = icon(res, label, size, size / 4);
         paint(i, false, ACCENT);
         GridLayout.LayoutParams p = new GridLayout.LayoutParams();
         p.width = size;
         p.height = size;
         int columns = grid.getColumnCount();
-        p.setMargins(0, 0, gap, columns == 2 && index < 2 ? gap : 0);
+        p.setMargins(0, 0, gap, columns == 4 || index < 2 ? gap : 0);
         grid.addView(i, p);
         return i;
     }
@@ -424,6 +375,7 @@ public class OverlayService extends AccessibilityService {
 
     private void paint(View v, boolean on, int color) {
         GradientDrawable d = shape(on ? color : GLASS, 100);
+        d.setStroke(dp(1), 0x45FFFFFF);
         v.setBackground(d);
     }
 
@@ -458,11 +410,6 @@ public class OverlayService extends AccessibilityService {
         nm.setInterruptionFilter(on ? NotificationManager.INTERRUPTION_FILTER_PRIORITY
                 : NotificationManager.INTERRUPTION_FILTER_ALL);
         paint(v, on, 0xFF8B6CFF);
-    }
-
-    private void media(int key) {
-        audio.dispatchMediaKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, key));
-        audio.dispatchMediaKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, key));
     }
 
     private void launch(Intent i) {

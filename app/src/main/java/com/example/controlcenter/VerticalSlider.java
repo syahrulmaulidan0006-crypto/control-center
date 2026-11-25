@@ -21,6 +21,7 @@ class VerticalSlider extends View {
     private final BooleanSupplier allowed;
     private float value;
     private boolean active;
+    private final int covered;
 
     VerticalSlider(Context context, int iconRes, float start, Listener listener,
             BooleanSupplier allowed) {
@@ -29,10 +30,11 @@ class VerticalSlider extends View {
         this.value = start;
         this.listener = listener;
         this.allowed = allowed;
+        this.covered = iconRes == R.drawable.ic_sun ? 0xFFFFB300 : 0xFF2F8CFF;
     }
 
     @Override protected void onDraw(Canvas c) {
-        float w = getWidth(), h = getHeight(), r = w * 0.38f;
+        float w = getWidth(), h = getHeight(), r = w / 2;
         clip.reset();
         clip.addRoundRect(new RectF(0, 0, w, h), r, r, Path.Direction.CW);
         c.save();
@@ -42,12 +44,12 @@ class VerticalSlider extends View {
         c.drawRect(0, h * (1 - value), w, h, paint);
         c.restore();
 
-        int size = Math.round(w * 0.4f);
+        int size = Math.round(w * 0.46f);
         int left = Math.round((w - size) / 2);
         int top = Math.round(h - size - w * 0.28f);
         icon.setBounds(left, top, left + size, top + size);
         // Ikon menjadi gelap bila tertutup isian terang.
-        icon.setTint(h * (1 - value) < top + size / 2f ? 0xFF4A5568 : 0xFFFFFFFF);
+        icon.setTint(h * (1 - value) < top + size / 2f ? covered : 0xFFFFFFFF);
         icon.draw(c);
     }
 
