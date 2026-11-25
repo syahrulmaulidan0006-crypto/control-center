@@ -16,6 +16,7 @@ class TileView extends View {
     final Item item;
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private Drawable icon;
+    private final int accent, onAccent;
     private boolean on;
     private float fill;
     private ValueAnimator animator;
@@ -24,6 +25,8 @@ class TileView extends View {
     TileView(Context context, Item item) {
         super(context);
         this.item = item;
+        accent = Theme.accent(context);
+        onAccent = Theme.onAccent(context);
         setIcon(item.icon);
         setContentDescription(item.label);
         wave1 = () -> setIcon(R.drawable.ic_wifi1);
@@ -65,7 +68,6 @@ class TileView extends View {
         float r = Math.min(cx, cy) - d;
         RectF circle = new RectF(cx - r, cy - r, cx + r, cy + r);
         Glass.draw(c, paint, circle, r, d, 0x1FFFFFFF);
-        int accent = Theme.accent(getContext());
         if (fill > 0) {
             paint.setColor(Theme.alpha(accent, 0xE0));
             c.drawCircle(cx, cy, r * fill, paint);
@@ -74,8 +76,7 @@ class TileView extends View {
         int half = Math.round(r * 0.48f);
         icon.setBounds(Math.round(cx) - half, Math.round(cy) - half,
                 Math.round(cx) + half, Math.round(cy) + half);
-        int on = Theme.onAccent(getContext());
-        icon.setTint(fill > 0.5f ? on : 0xFFFFFFFF);
+        icon.setTint(fill > 0.5f ? onAccent : 0xFFFFFFFF);
         icon.draw(c);
     }
 
