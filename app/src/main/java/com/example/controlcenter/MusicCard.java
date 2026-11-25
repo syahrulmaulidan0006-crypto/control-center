@@ -57,40 +57,38 @@ class MusicCard extends LinearLayout {
         audio = context.getSystemService(AudioManager.class);
         sessions = context.getSystemService(MediaSessionManager.class);
         setOrientation(VERTICAL);
-        setPadding(dp(10), dp(12), dp(10), dp(6));
-        // Ukuran isi mengikuti sisi kotak.
-        int cover = Math.round(side * 0.30f);
-        int control = Math.min(dp(44), (side - dp(20)) / 3);
+        setPadding(dp(10), dp(12), dp(10), dp(8));
 
         LinearLayout top = new LinearLayout(context);
         top.setGravity(Gravity.CENTER_VERTICAL);
+        top.setPadding(dp(3), 0, dp(3), 0);
         art = new ImageView(context);
         art.setContentDescription("Sampul album");
         art.setOutlineProvider(new ViewOutlineProvider() {
             @Override public void getOutline(View v, Outline o) {
-                o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), dp(14));
+                o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), dp(12));
             }
         });
         art.setClipToOutline(true);
         art.setOnClickListener(v -> {
             if (!listening) { needPermission.run(); return; }
             if (controller != null && controller.getSessionActivity() != null) {
-                onOpen = closePanel;
-                try { controller.getSessionActivity().send(); onOpen.run(); }
+                try { controller.getSessionActivity().send(); closePanel.run(); }
                 catch (Exception ignored) { }
             }
         });
-        top.addView(art, new LayoutParams(cover, cover));
+        top.addView(art, new LayoutParams(dp(42), dp(42)));
 
         LinearLayout info = new LinearLayout(context);
         info.setOrientation(VERTICAL);
         info.setPadding(dp(8), 0, 0, 0);
-        title = line(14, Color.WHITE);
-        artist = line(12, 0xB3FFFFFF);
+        title = line(13, Color.WHITE);
+        artist = line(11, 0xB3FFFFFF);
         info.addView(title);
         info.addView(artist);
         top.addView(info, new LayoutParams(0, -2, 1));
         addView(top, new LayoutParams(-1, -2));
+        addView(new View(context), new LayoutParams(1, 0, 1));
 
         progress = new SeekBar(context);
         progress.setMax(1000);

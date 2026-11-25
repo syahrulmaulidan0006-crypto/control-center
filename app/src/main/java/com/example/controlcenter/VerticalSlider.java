@@ -39,10 +39,12 @@ class VerticalSlider extends View {
         clip.addRoundRect(new RectF(0, 0, w, h), r, r, Path.Direction.CW);
         c.save();
         c.clipPath(clip);
-        c.drawColor(0x38FFFFFF);
+        float d = getResources().getDisplayMetrics().density;
+        Glass.draw(c, paint, new RectF(0, 0, w, h), r, d, 0x1FFFFFFF);
         paint.setColor(0xEBFFFFFF);
         c.drawRect(0, h * (1 - value), w, h, paint);
         c.restore();
+        Glass.shine(c, paint, new RectF(0, 0, w, h), r, d);
 
         int size = Math.round(w * 0.46f);
         int left = Math.round((w - size) / 2);

@@ -4,6 +4,7 @@ import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
 import android.view.MotionEvent;
 import android.view.View;
@@ -62,17 +63,13 @@ class TileView extends View {
         float cx = getWidth() / 2f, cy = getHeight() / 2f;
         float d = getResources().getDisplayMetrics().density;
         float r = Math.min(cx, cy) - d;
-        paint.setStyle(Paint.Style.FILL);
-        paint.setColor(0x38FFFFFF);
-        c.drawCircle(cx, cy, r, paint);
+        RectF circle = new RectF(cx - r, cy - r, cx + r, cy + r);
+        Glass.draw(c, paint, circle, r, d, 0x1FFFFFFF);
         if (fill > 0) {
-            paint.setColor(item.color);
+            paint.setColor((item.color & 0x00FFFFFF) | 0xD9000000);
             c.drawCircle(cx, cy, r * fill, paint);
+            Glass.shine(c, paint, circle, r, d);
         }
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(d);
-        paint.setColor(0x45FFFFFF);
-        c.drawCircle(cx, cy, r, paint);
         int half = Math.round(r * 0.48f);
         icon.setBounds(Math.round(cx) - half, Math.round(cy) - half,
                 Math.round(cx) + half, Math.round(cy) + half);
