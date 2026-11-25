@@ -49,7 +49,7 @@ class Panel extends Sheet {
         land = screen.widthPixels > screen.heightPixels;
         gap = dp(land ? 10 : 14);
         if (land) {
-            unit = Math.min((screen.heightPixels - dp(40) - 4 * gap) / 4,
+            unit = Math.min((screen.heightPixels - dp(70) - 4 * gap) / 4,
                     (screen.widthPixels - dp(80) - 8 * gap) / 8);
             width = unit * 8 + gap * 8;
         } else {
@@ -67,9 +67,15 @@ class Panel extends Sheet {
         buildShortcuts();
 
         FrameLayout wrap = new FrameLayout(service);
-        wrap.setPadding(0, dp(land ? 20 : 44), 0, dp(land ? 10 : 40));
+        wrap.setPadding(0, dp(land ? 14 : 40), 0, dp(land ? 8 : 40));
         wrap.setClipChildren(false);
-        wrap.addView(box, new LayoutParams(width, -2, Gravity.CENTER));
+        LinearLayout page = new LinearLayout(service);
+        page.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams statusSize = new LinearLayout.LayoutParams(-1, dp(24));
+        statusSize.bottomMargin = dp(land ? 6 : 16);
+        page.addView(new StatusRow(service), statusSize);
+        page.addView(box, new LinearLayout.LayoutParams(-1, -2));
+        wrap.addView(page, new LayoutParams(width, -2, Gravity.CENTER));
         wrap.setOnClickListener(v -> service.closePanel());
         scroll = new ScrollView(service);
         scroll.setFillViewport(true);

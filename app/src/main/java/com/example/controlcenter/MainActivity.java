@@ -4,6 +4,8 @@ import android.Manifest;
 import android.app.Activity;
 import android.app.ActivityManager;
 import android.app.AlertDialog;
+import android.app.Notification;
+import android.app.NotificationChannel;
 import android.app.ApplicationExitInfo;
 import android.app.NotificationManager;
 import android.content.ComponentName;
@@ -132,11 +134,14 @@ public class MainActivity extends Activity {
         colors();
 
         title("Notifikasi", 20);
+        note("Popup terakhir: " + Diag.read(this));
+        button("Tes popup sekarang", this::test);
         toggle("Popup notifikasi", "popup", true);
         toggle("Suara notifikasi", "sound", true);
         toggle("Sembunyikan isi pesan", "hideContent", false);
         toggle("Sembunyikan popup saat layar penuh", "hideFullscreen", true);
         toggle("Geser kiri atas untuk pusat notifikasi", "leftSwipe", true);
+        toggle("Matikan area geser saat layar mendatar (game)", "noSwipeLand", false);
         button("Pilih aplikasi yang boleh muncul", this::apps);
         toggle("Bisukan suara bawaan (agar tidak dobel)", "muteNative", true);
         boolean heads = Settings.Global.getInt(getContentResolver(),
@@ -146,8 +151,8 @@ public class MainActivity extends Activity {
                 : "Nyalakan kembali popup bawaan (Shizuku)", () -> headsUp(!heads));
         note(heads ? "Cara terbersih. Memerlukan Shizuku aktif. Sebagian HP mengabaikannya."
                 : "Popup bawaan sedang dimatikan. Nyalakan kembali sebelum menghapus aplikasi.");
-        toggle("Tanpa Shizuku: hapus notifikasi bawaan saat popup kita tampil",
-                "removeNative", false);
+        toggle("Ganti popup bawaan: hapus notifikasi bawaan saat popup kita tampil",
+                "removeNative", true);
         note("Popup bawaan bisa terlihat sekejap, dan notifikasinya hilang dari panel "
                 + "bawaan. Salinannya ada di pusat notifikasi kita.");
 
@@ -217,6 +222,22 @@ public class MainActivity extends Activity {
         if (Build.VERSION.SDK_INT >= 31) p.add(Manifest.permission.BLUETOOTH_CONNECT);
         if (Build.VERSION.SDK_INT >= 33) p.add(Manifest.permission.POST_NOTIFICATIONS);
         requestPermissions(p.toArray(new String[0]), 1);
+    }
+
+    private void test() {
+        NotificationManager nm = getSystemService(NotificationManager.class);
+        if (!nm.areNotificationsEnabled()) {
+            Toast.makeText(this, "Izinkan notifikasi aplikasi ini dahulu", Toast.LENGTH_LONG).show();
+            return;
+        }
+        nm.createNotificationChannel(new NotificationChannel("tes", "Tes popup",
+                NotificationManager.IMPORTANCE_DEFAULT));
+        Bundle extra = new Bundle();
+        extra.putBoolean("cc.tes", true);
+        nm.notify((int) (System.currentTimeMillis() % 100000), new Notification.Builder(this, "tes")
+                .setSmallIcon(R.drawable.ic_bell).setContentTitle("Tes popup")
+                .setContentText("Popup Control Center berfungsi").addExtras(extra).build());
+        root.postDelayed(this::build, 1200);
     }
 
     private void headsUp(boolean on) {
@@ -375,7 +396,7 @@ public class MainActivity extends Activity {
         s.setChecked(Prefs.is(this, key, fallback));
         s.setOnCheckedChangeListener((v, on) -> {
             Prefs.of(this).edit().putBoolean(key, on).commit();
-            if (key.equals("leftSwipe") || key.equals("sound") || key.equals("muteNative")) {
+            if (key.equals("leftSwipe") || key.equals("noSwipeLand") || key.equals("sound") || key.equals("muteNative")) {
                 sendBroadcast(new Intent(OverlayService.REFRESH).setPackage(getPackageName()));
             }
         });
