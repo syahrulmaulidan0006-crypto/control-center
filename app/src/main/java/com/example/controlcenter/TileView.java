@@ -65,14 +65,17 @@ class TileView extends View {
         float r = Math.min(cx, cy) - d;
         RectF circle = new RectF(cx - r, cy - r, cx + r, cy + r);
         Glass.draw(c, paint, circle, r, d, 0x1FFFFFFF);
+        int accent = Theme.accent(getContext());
         if (fill > 0) {
-            paint.setColor((item.color & 0x00FFFFFF) | 0xD9000000);
+            paint.setColor(Theme.alpha(accent, 0xE0));
             c.drawCircle(cx, cy, r * fill, paint);
             Glass.shine(c, paint, circle, r, d);
         }
         int half = Math.round(r * 0.48f);
         icon.setBounds(Math.round(cx) - half, Math.round(cy) - half,
                 Math.round(cx) + half, Math.round(cy) + half);
+        int on = Theme.onAccent(getContext());
+        icon.setTint(fill > 0.5f ? on : 0xFFFFFFFF);
         icon.draw(c);
     }
 

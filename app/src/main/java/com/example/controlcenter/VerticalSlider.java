@@ -30,7 +30,7 @@ class VerticalSlider extends View {
         this.value = start;
         this.listener = listener;
         this.allowed = allowed;
-        this.covered = iconRes == R.drawable.ic_sun ? 0xFFFFB300 : 0xFF2F8CFF;
+        this.covered = Theme.onWhite(context);
     }
 
     @Override protected void onDraw(Canvas c) {

@@ -1,0 +1,243 @@
+package com.example.controlcenter;
+
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.service.notification.StatusBarNotification;
+import android.view.Gravity;
+import android.view.View;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextClock;
+import android.widget.TextView;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/** Pusat notifikasi: jam besar dan kartu yang ditumpuk per aplikasi. */
+class Center extends Sheet {
+    private final Controls controls;
+    private final LinearLayout box, list;
+    private final Set<String> open = new HashSet<>();
+    private TileView torch;
+
+    private final Runnable poll = new Runnable() {
+        @Override public void run() {
+            torch.setOn(controls.isOn(Item.TORCH), true);
+            postDelayed(this, 600);
+        }
+    };
+
+    Center(OverlayService service, Controls controls) {
+        super(service);
+        this.controls = controls;
+        int width = Math.min(getResources().getDisplayMetrics().widthPixels - dp(28), dp(430));
+
+        box = new LinearLayout(service);
+        box.setOrientation(LinearLayout.VERTICAL);
+
+        TextClock date = clock("EEEE, d MMMM", 16);
+        box.addView(date);
+        TextClock time = clock("HH:mm", 82);
+        time.setFormat12Hour("h:mm");
+        time.setTypeface(Typeface.create("sans-serif-thin", Typeface.NORMAL));
+        box.addView(time);
+
+        list = new LinearLayout(service);
+        list.setOrientation(LinearLayout.VERTICAL);
+        box.addView(list, new LinearLayout.LayoutParams(-1, -2));
+
+        FrameLayout wrap = new FrameLayout(service);
+        wrap.setPadding(0, dp(48), 0, dp(120));
+        wrap.addView(box, new FrameLayout.LayoutParams(width, -2, Gravity.CENTER_HORIZONTAL));
+        wrap.setOnClickListener(v -> service.closePanel());
+        scroll = new ScrollView(service);
+        scroll.setFillViewport(true);
+        scroll.setVerticalScrollBarEnabled(false);
+        scroll.addView(wrap);
+        addView(scroll, new LayoutParams(-1, -1));
+
+        torch = new TileView(service, Item.TORCH);
+        torch.setOnClickListener(v -> controls.click(Item.TORCH));
+        torch.setOn(controls.isOn(Item.TORCH), false);
+        addView(torch, corner(Gravity.START));
+        TileView camera = new TileView(service, Item.CAMERA);
+        camera.setOnClickListener(v -> controls.click(Item.CAMERA));
+        addView(camera, corner(Gravity.END));
+        build();
+    }
+
+    private LayoutParams corner(int side) {
+        LayoutParams p = new LayoutParams(dp(60), dp(60), Gravity.BOTTOM | side);
+        p.setMargins(dp(34), 0, dp(34), dp(36));
+        return p;
+    }
+
+    @Override protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        MusicListener.observe(() -> {
+            removeCallbacks(rebuild);
+            postDelayed(rebuild, 150);
+        });
+        post(poll);
+    }
+
+    @Override protected void onDetachedFromWindow() {
+        MusicListener.observe(null);
+        removeCallbacks(poll);
+        removeCallbacks(rebuild);
+        super.onDetachedFromWindow();
+    }
+
+    private final Runnable rebuild = this::build;
+
+    private void build() {
+        list.removeAllViews();
+        if (!MusicListener.connected()) {
+            empty("Akses notifikasi belum tersambung.\nKetuk untuk membuka pengaturan.",
+                    () -> controls.launch(new android.content.Intent(
+                            android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)));
+            return;
+        }
+        List<StatusBarNotification> all = MusicListener.list();
+        if (all.isEmpty()) { empty("Tidak ada notifikasi", null); return; }
+        long hour = System.currentTimeMillis() - 3600_000;
+        Map<String, List<StatusBarNotification>> fresh = new LinkedHashMap<>();
+        Map<String, List<StatusBarNotification>> older = new LinkedHashMap<>();
+        for (StatusBarNotification n : all) {
+            Map<String, List<StatusBarNotification>> target =
+                    fresh.containsKey(n.getPackageName()) || n.getPostTime() >= hour
+                            ? fresh : older;
+            target.computeIfAbsent(n.getPackageName(), k -> new ArrayList<>()).add(n);
+        }
+        boolean first = true;
+        if (!fresh.isEmpty()) { section("Baru", all); groups(fresh); first = false; }
+        if (!older.isEmpty()) { section("Sebelumnya", first ? all : null); groups(older); }
+    }
+
+    private void groups(Map<String, List<StatusBarNotification>> map) {
+        for (Map.Entry<String, List<StatusBarNotification>> g : map.entrySet()) {
+            List<StatusBarNotification> items = g.getValue();
+            String key = g.getKey();
+            if (items.size() == 1) { card(items.get(0), null); continue; }
+            if (open.contains(key)) {
+                pill(list, "Ringkas " + Notes.app(getContext(), key), () -> {
+                    open.remove(key);
+                    build();
+                });
+                for (StatusBarNotification n : items) card(n, null);
+            } else {
+                card(items.get(0), () -> { open.add(key); build(); });
+                layer(16, 0x33FFFFFF);
+                layer(32, 0x1CFFFFFF);
+                TextView more = text((items.size() - 1) + " lainnya", 12, 0xCCFFFFFF);
+                more.setGravity(Gravity.CENTER);
+                more.setPadding(0, dp(4), 0, 0);
+                list.addView(more);
+            }
+        }
+    }
+
+    private void card(StatusBarNotification n, Runnable stack) {
+        NoteCard c = new NoteCard(getContext(), n, 0x2AFFFFFF);
+        c.setOnClickListener(v -> {
+            if (stack != null) { stack.run(); return; }
+            Notes.open(getContext(), n);
+            service.closePanel();
+        });
+        if (n.isClearable()) {
+            c.gestures(() -> {
+                MusicListener.dismiss(n.getKey());
+                c.setVisibility(GONE);
+            }, null, null);
+        }
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2);
+        p.topMargin = dp(10);
+        list.addView(c, p);
+    }
+
+    private void layer(int inset, int color) {
+        View v = new View(getContext());
+        v.setBackground(new Glass(getContext(), 8, color));
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, dp(8));
+        p.setMargins(dp(inset), dp(1), dp(inset), 0);
+        list.addView(v, p);
+    }
+
+    private void section(String name, List<StatusBarNotification> clear) {
+        LinearLayout row = new LinearLayout(getContext());
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(6), dp(14), 0, 0);
+        TextView t = text(name, 20, Color.WHITE);
+        t.setTypeface(Typeface.DEFAULT_BOLD);
+        row.addView(t, new LinearLayout.LayoutParams(0, -2, 1));
+        if (clear != null) {
+            pill(row, "Hapus semua", () -> {
+                for (StatusBarNotification n : clear) {
+                    if (n.isClearable()) MusicListener.dismiss(n.getKey());
+                }
+            });
+        }
+        list.addView(row, new LinearLayout.LayoutParams(-1, -2));
+    }
+
+    private void pill(LinearLayout parent, String label, Runnable click) {
+        TextView t = text(label, 13, Color.WHITE);
+        t.setGravity(Gravity.CENTER);
+        t.setPadding(dp(18), 0, dp(18), 0);
+        t.setBackground(new Glass(getContext(), 22, 0x22FFFFFF));
+        t.setOnClickListener(v -> click.run());
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-2, dp(40));
+        p.topMargin = parent == list ? dp(10) : 0;
+        p.gravity = Gravity.END;
+        parent.addView(t, p);
+    }
+
+    private void empty(String message, Runnable click) {
+        LinearLayout holder = new LinearLayout(getContext());
+        holder.setOrientation(LinearLayout.VERTICAL);
+        holder.setGravity(Gravity.CENTER);
+        holder.setPadding(dp(20), dp(60), dp(20), dp(40));
+        ImageView icon = new ImageView(getContext());
+        icon.setImageResource(R.drawable.ic_bell);
+        icon.setPadding(dp(20), dp(20), dp(20), dp(20));
+        icon.setBackground(new Glass(getContext(), 40, 0x22FFFFFF));
+        holder.addView(icon, new LinearLayout.LayoutParams(dp(80), dp(80)));
+        TextView t = text(message, 15, 0xD9FFFFFF);
+        t.setGravity(Gravity.CENTER);
+        t.setPadding(0, dp(14), 0, 0);
+        holder.addView(t);
+        if (click != null) holder.setOnClickListener(v -> click.run());
+        list.addView(holder, new LinearLayout.LayoutParams(-1, -2));
+    }
+
+    private TextClock clock(String format, int size) {
+        TextClock c = new TextClock(getContext());
+        c.setFormat12Hour(format);
+        c.setFormat24Hour(format);
+        c.setTextSize(size);
+        c.setTextColor(Color.WHITE);
+        c.setGravity(Gravity.CENTER);
+        c.setLayoutParams(new LinearLayout.LayoutParams(-1, -2));
+        return c;
+    }
+
+    private TextView text(String value, int size, int color) {
+        TextView t = new TextView(getContext());
+        t.setText(value);
+        t.setTextSize(size);
+        t.setTextColor(color);
+        return t;
+    }
+
+    @Override void move(float value, float shown) {
+        box.setTranslationY(-(1 - value) * dp(260));
+        float scale = 0.94f + 0.06f * shown;
+        box.setScaleX(scale);
+        box.setScaleY(scale);
+    }
+}

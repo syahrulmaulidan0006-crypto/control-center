@@ -9,11 +9,7 @@ import android.media.AudioManager;
 import android.provider.Settings;
 import android.util.DisplayMetrics;
 import android.view.Gravity;
-import android.view.KeyEvent;
-import android.view.MotionEvent;
-import android.view.VelocityTracker;
 import android.view.View;
-import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.FrameLayout;
@@ -25,10 +21,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /** Isi Control Center: kotak koneksi, musik, slider, tombol, dan lapisan mengambang. */
-class Panel extends FrameLayout {
-    private final OverlayService service;
+class Panel extends Sheet {
     private final Controls controls;
-    private final ScrollView scroll;
     private final LinearLayout box;
     private final List<TileView> tiles = new ArrayList<>();
     private final List<TextView> states = new ArrayList<>();
@@ -36,9 +30,7 @@ class Panel extends FrameLayout {
     private final int width, unit, gap;
     private View connections;
     private FrameLayout expanded, popup;
-    private float downX, downY, progress;
-    private boolean dragging, collapsing;
-    private VelocityTracker velocity;
+    private boolean collapsing;
 
     private final Runnable poll = new Runnable() {
         @Override public void run() {
@@ -49,7 +41,6 @@ class Panel extends FrameLayout {
 
     Panel(OverlayService service, Controls controls) {
         super(service);
-        this.service = service;
         this.controls = controls;
         DisplayMetrics screen = getResources().getDisplayMetrics();
         gap = dp(14);
@@ -371,12 +362,8 @@ class Panel extends FrameLayout {
 
     // ---------------------------------------------------------------- Gerakan
 
-    /** 0 = tertutup, 1 = terbuka penuh. */
-    void setProgress(float value) {
-        progress = value;
-        float shown = Math.max(0, Math.min(1, value));
-        setAlpha(Math.min(1, shown * 1.4f));
-        float away = 1 - Math.min(1.06f, value);
+    @Override void move(float value, float shown) {
+        float away = 1 - value;
         for (int i = 0; i < box.getChildCount(); i++) {
             // Tiap bagian bergerak sedikit berbeda sehingga terasa berurutan.
             box.getChildAt(i).setTranslationY(-away * dp(70 + i * 34));
@@ -388,61 +375,11 @@ class Panel extends FrameLayout {
         box.setScaleY(scale);
     }
 
-    float progress() { return progress; }
-
-    @Override public boolean dispatchKeyEvent(KeyEvent e) {
-        if (e.getKeyCode() == KeyEvent.KEYCODE_BACK) {
-            if (e.getAction() == KeyEvent.ACTION_UP) {
-                if (popup != null) closePicker();
-                else if (expanded != null) collapse();
-                else service.closePanel();
-            }
-            return true;
-        }
-        return super.dispatchKeyEvent(e);
-    }
-
-    /** Geser ke atas saat sudah di bagian bawah: panel mengikuti jari. */
-    @Override public boolean onInterceptTouchEvent(MotionEvent e) {
-        if (popup != null || expanded != null) return false;
-        if (e.getActionMasked() == MotionEvent.ACTION_DOWN) {
-            downX = e.getRawX();
-            downY = e.getRawY();
-            dragging = false;
-        } else if (e.getActionMasked() == MotionEvent.ACTION_MOVE) {
-            float dy = e.getRawY() - downY;
-            if (-dy > ViewConfiguration.get(getContext()).getScaledTouchSlop()
-                    && -dy > Math.abs(e.getRawX() - downX) * 1.5f
-                    && !scroll.canScrollVertically(1)) {
-                dragging = true;
-                downY = e.getRawY();
-                service.stopAnimation();
-                velocity = VelocityTracker.obtain();
-                return true;
-            }
-        }
+    @Override boolean back() {
+        if (popup != null) { closePicker(); return true; }
+        if (expanded != null) { collapse(); return true; }
         return false;
     }
 
-    @Override public boolean onTouchEvent(MotionEvent e) {
-        if (!dragging) return super.onTouchEvent(e);
-        MotionEvent raw = MotionEvent.obtain(e);
-        raw.setLocation(e.getRawX(), e.getRawY());
-        velocity.addMovement(raw);
-        raw.recycle();
-        int a = e.getActionMasked();
-        if (a == MotionEvent.ACTION_MOVE) {
-            float p = 1 + Math.min(0, e.getRawY() - downY) / dp(360);
-            service.drag(Math.max(0, p));
-        } else if (a == MotionEvent.ACTION_UP || a == MotionEvent.ACTION_CANCEL) {
-            velocity.computeCurrentVelocity(1000);
-            boolean close = velocity.getYVelocity() < -dp(500) || progress < 0.6f;
-            velocity.recycle();
-            dragging = false;
-            if (close) service.closePanel(); else service.openFully();
-        }
-        return true;
-    }
-
-    private int dp(int v) { return Math.round(v * getResources().getDisplayMetrics().density); }
+    @Override boolean canDrag() { return popup == null && expanded == null; }
 }

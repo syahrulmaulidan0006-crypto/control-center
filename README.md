@@ -17,6 +17,10 @@ unduh artifact "ControlCenter-apk".
 Jika layanan diblokir ("setelan terbatas", Android 13+): Info aplikasi >
 menu titik tiga > Izinkan setelan terbatas.
 
+## Notifikasi
+- Geser dari kiri atas: pusat notifikasi. Popup, suara, warna, dan pilihan aplikasi
+  diatur di halaman aplikasi. Akses notifikasi dipakai hanya di perangkat.
+
 ## Mode
 - **Mode A**: Wi-Fi, data, Bluetooth, pesawat, lokasi, mode gelap, NFC membuka menu sistem.
 - **Mode B**: memakai aplikasi Shizuku untuk mengubahnya langsung. Jalankan Shizuku

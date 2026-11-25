@@ -1,4 +1,4 @@
 <resources>
     <string name="app_name">Control Center</string>
-    <string name="service_info">Menampilkan Control Center saat status bar kanan digeser. Tidak membaca isi layar.</string>
+    <string name="service_info">Menampilkan Control Center dan pusat notifikasi saat status bar digeser. Tidak membaca isi layar.</string>
 </resources>

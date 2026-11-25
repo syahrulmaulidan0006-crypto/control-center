@@ -12,7 +12,6 @@ import android.media.session.MediaSessionManager;
 import android.media.session.PlaybackState;
 import android.os.Handler;
 import android.os.Looper;
-import android.os.SystemClock;
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.KeyEvent;
@@ -20,7 +19,6 @@ import android.view.View;
 import android.view.ViewOutlineProvider;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.SeekBar;
 import android.widget.TextView;
 import java.util.List;
 
@@ -31,9 +29,8 @@ class MusicCard extends LinearLayout {
     private final MediaSessionManager sessions;
     private final ImageView art, play;
     private final TextView title, artist;
-    private final SeekBar progress;
     private MediaController controller;
-    private boolean listening, seeking;
+    private boolean listening;
     private Runnable onOpen = () -> { };
 
     private final MediaController.Callback callback = new MediaController.Callback() {
@@ -46,7 +43,7 @@ class MusicCard extends LinearLayout {
 
     private final Runnable tick = new Runnable() {
         @Override public void run() {
-            updateProgress();
+            updatePlay();
             handler.postDelayed(this, 500);
         }
     };
@@ -76,7 +73,7 @@ class MusicCard extends LinearLayout {
                 catch (Exception ignored) { }
             }
         });
-        top.addView(art, new LayoutParams(dp(42), dp(42)));
+        top.addView(art, new LayoutParams(dp(48), dp(48)));
 
         LinearLayout info = new LinearLayout(context);
         info.setOrientation(VERTICAL);
@@ -88,27 +85,6 @@ class MusicCard extends LinearLayout {
         top.addView(info, new LayoutParams(0, -2, 1));
         addView(top, new LayoutParams(-1, -2));
         addView(new View(context), new LayoutParams(1, 0, 1));
-
-        progress = new SeekBar(context);
-        progress.setMax(1000);
-        progress.setThumbTintList(android.content.res.ColorStateList.valueOf(Color.WHITE));
-        progress.setProgressTintList(android.content.res.ColorStateList.valueOf(Color.WHITE));
-        progress.setProgressBackgroundTintList(
-                android.content.res.ColorStateList.valueOf(0x80FFFFFF));
-        progress.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override public void onProgressChanged(SeekBar b, int v, boolean user) { }
-            @Override public void onStartTrackingTouch(SeekBar b) { seeking = true; }
-            @Override public void onStopTrackingTouch(SeekBar b) {
-                seeking = false;
-                long length = duration();
-                if (controller != null && length > 0) {
-                    controller.getTransportControls().seekTo(length * b.getProgress() / 1000);
-                }
-            }
-        });
-        progress.setPadding(dp(8), 0, dp(8), 0);
-        // Ruang sisa diisi garis progres agar kontrol menempel di bawah.
-        addView(progress, new LayoutParams(-1, 0, 1));
 
         LinearLayout buttons = new LinearLayout(context);
         buttons.setGravity(Gravity.CENTER);
@@ -165,11 +141,6 @@ class MusicCard extends LinearLayout {
         return s != null && s.getState() == PlaybackState.STATE_PLAYING;
     }
 
-    private long duration() {
-        MediaMetadata m = controller == null ? null : controller.getMetadata();
-        return m == null ? 0 : m.getLong(MediaMetadata.METADATA_KEY_DURATION);
-    }
-
     private void refresh() {
         MediaMetadata m = controller == null ? null : controller.getMetadata();
         Bitmap cover = null;
@@ -206,24 +177,11 @@ class MusicCard extends LinearLayout {
             art.setImageResource(R.drawable.ic_music);
         }
         setBackground(new Glass(getContext(), 32, tint));
-        play.setImageResource(playing() ? R.drawable.ic_pause : R.drawable.ic_play);
-        updateProgress();
+        updatePlay();
     }
 
-    private void updateProgress() {
-        if (controller == null) play.setImageResource(
-                audio.isMusicActive() ? R.drawable.ic_pause : R.drawable.ic_play);
-        long length = duration();
-        PlaybackState s = controller == null ? null : controller.getPlaybackState();
-        progress.setEnabled(length > 0);
-        if (seeking) return;
-        if (s == null || length <= 0) { progress.setProgress(0); return; }
-        long position = s.getPosition();
-        if (s.getState() == PlaybackState.STATE_PLAYING) {
-            position += (long) ((SystemClock.elapsedRealtime() - s.getLastPositionUpdateTime())
-                    * s.getPlaybackSpeed());
-        }
-        progress.setProgress((int) Math.max(0, Math.min(1000, position * 1000 / length)));
+    private void updatePlay() {
+        play.setImageResource(playing() ? R.drawable.ic_pause : R.drawable.ic_play);
     }
 
     private ImageView button(LinearLayout row, int res, String label, int key) {

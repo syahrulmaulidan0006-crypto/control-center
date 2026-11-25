@@ -13,6 +13,10 @@
     <uses-permission android:name="android.permission.NFC" />
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
         <package android:name="com.miui.screenrecorder" />
         <package android:name="com.xiaomi.scanner" />
         <package android:name="com.google.ar.lens" />
@@ -21,14 +25,15 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-feature android:name="android.hardware.camera.flash" android:required="false" />
 
-    <application android:label="@string/app_name"
+    <application android:name=".App" android:label="@string/app_name"
         android:icon="@android:drawable/ic_menu_manage"
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
         <!-- Tidak muncul di aplikasi terbaru agar tidak ikut tersapu saat dibersihkan. -->
         <activity android:name=".MainActivity" android:exported="true"
-            android:excludeFromRecents="true">
+            android:excludeFromRecents="true" android:process=":ui">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

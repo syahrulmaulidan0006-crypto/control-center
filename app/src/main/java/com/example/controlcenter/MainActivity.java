@@ -2,144 +2,312 @@ package com.example.controlcenter;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.ActivityManager;
+import android.app.AlertDialog;
+import android.app.NotificationManager;
 import android.content.ComponentName;
 import android.content.Intent;
+import android.content.pm.ResolveInfo;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.PowerManager;
 import android.provider.Settings;
-import android.widget.Button;
+import android.view.Gravity;
+import android.view.View;
 import android.widget.LinearLayout;
-import android.widget.RadioButton;
-import android.widget.RadioGroup;
 import android.widget.ScrollView;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
 import rikka.shizuku.Shizuku;
 
+/** Halaman status dan pengaturan. */
 public class MainActivity extends Activity {
-    private TextView status;
-    private final Shizuku.OnRequestPermissionResultListener result = (code, grant) -> update();
+    private static final int CARD = 0xFF1C2450, MUTED = 0xFFC4CBE8;
+    private LinearLayout root;
+    private ScrollView scroll;
+    private final Shizuku.OnRequestPermissionResultListener result = (code, grant) -> build();
+    private final Shizuku.OnBinderReceivedListener binder = this::build;
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
-        LinearLayout root = new LinearLayout(this);
+        root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        int p = (int) (24 * getResources().getDisplayMetrics().density);
-        root.setPadding(p, p * 2, p, p);
+        root.setPadding(dp(18), dp(40), dp(18), dp(28));
+        scroll = new ScrollView(this);
+        scroll.setBackgroundColor(0xFF0F1536);
+        scroll.addView(root);
+        setContentView(scroll);
+        Shizuku.addRequestPermissionResultListener(result);
+        Shizuku.addBinderReceivedListenerSticky(binder);
+    }
 
-        text(root, "Berikan izin di bawah. Setelah layanan aktif, geser ke bawah "
-                + "dari status bar bagian kanan.");
-        add(root, "1. Aktifkan/matikan layanan (Aksesibilitas)",
+    @Override protected void onResume() {
+        super.onResume();
+        build();
+    }
+
+    @Override protected void onDestroy() {
+        Shizuku.removeRequestPermissionResultListener(result);
+        Shizuku.removeBinderReceivedListener(binder);
+        super.onDestroy();
+    }
+
+    private void build() {
+        if (root == null) return;
+        root.removeAllViews();
+        title("Status layanan", 28);
+        note("Titik hijau berarti siap. Merah perlu diperbaiki agar tetap berjalan.");
+
+        String enabled = Settings.Secure.getString(getContentResolver(),
+                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+        ComponentName service = new ComponentName(this, OverlayService.class);
+        boolean accessible = enabled != null && (enabled.contains(service.flattenToString())
+                || enabled.contains(service.flattenToShortString()));
+        status("Aksesibilitas", accessible,
                 () -> open(Settings.ACTION_ACCESSIBILITY_SETTINGS, false));
-        add(root, "2. Izin ubah pengaturan (kecerahan, rotasi)",
-                () -> open(Settings.ACTION_MANAGE_WRITE_SETTINGS, true));
-        add(root, "3. Izin Jangan Ganggu",
-                () -> open(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS, false));
-        add(root, "4. Izin akses notifikasi (sinkron musik)",
+        status("Layanan sedang berjalan", running(), () -> {
+            Toast.makeText(this, "Matikan lalu nyalakan lagi layanan Control Center",
+                    Toast.LENGTH_LONG).show();
+            open(Settings.ACTION_ACCESSIBILITY_SETTINGS, false);
+        });
+        NotificationManager nm = getSystemService(NotificationManager.class);
+        status("Akses notifikasi", nm.isNotificationListenerAccessGranted(
+                        new ComponentName(this, MusicListener.class)),
                 () -> open(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS, false));
-        add(root, "5. Izin lokasi dan Bluetooth (daftar Wi-Fi/perangkat)", () -> {
-            if (Build.VERSION.SDK_INT >= 31) {
-                requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION,
-                        Manifest.permission.ACCESS_COARSE_LOCATION,
-                        Manifest.permission.BLUETOOTH_CONNECT}, 1);
-            } else {
-                requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION,
-                        Manifest.permission.ACCESS_COARSE_LOCATION}, 1);
-            }
-        });
-
-        text(root, "\nAgar tetap aktif setelah aplikasi ditutup");
-        add(root, "6. Bebaskan dari penghemat baterai", () -> {
-            if (getSystemService(PowerManager.class)
-                    .isIgnoringBatteryOptimizations(getPackageName())) {
-                Toast.makeText(this, "Sudah dibebaskan", Toast.LENGTH_SHORT).show();
-            } else {
-                open(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, true);
-            }
-        });
-        add(root, "7. Mulai otomatis (Xiaomi/Redmi/POCO)", () -> {
+        status("Bebas penghemat baterai", getSystemService(PowerManager.class)
+                        .isIgnoringBatteryOptimizations(getPackageName()),
+                () -> open(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, true));
+        status("Ubah pengaturan (kecerahan, rotasi)", Settings.System.canWrite(this),
+                () -> open(Settings.ACTION_MANAGE_WRITE_SETTINGS, true));
+        status("Jangan Ganggu", nm.isNotificationPolicyAccessGranted(),
+                () -> open(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS, false));
+        status("Lokasi (daftar Wi-Fi)", checkSelfPermission(
+                Manifest.permission.ACCESS_FINE_LOCATION) == 0, this::permissions);
+        manual("Mulai otomatis (Xiaomi)", () -> {
             try {
-                startActivity(new Intent().setComponent(new ComponentName(
-                        "com.miui.securitycenter",
-                        "com.miui.permcenter.autostart.AutoStartManagementActivity")));
+                startActivity(new Intent().setClassName("com.miui.securitycenter",
+                        "com.miui.permcenter.autostart.AutoStartManagementActivity"));
+            } catch (Exception e) {
+                open(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, true);
+            }
+        });
+        manual("Pop-up saat di latar belakang (Xiaomi)", () -> {
+            try {
+                startActivity(new Intent("miui.intent.action.APP_PERM_EDITOR")
+                        .setClassName("com.miui.securitycenter",
+                                "com.miui.permcenter.permissions.PermissionsEditorActivity")
+                        .putExtra("extra_pkgname", getPackageName()));
             } catch (Exception e) {
                 open(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, true);
             }
         });
 
-        text(root, "\nPilih mode");
-        RadioGroup group = new RadioGroup(this);
-        RadioButton a = radio(group, "Mode A: biasa. Wi-Fi, data, dan lainnya membuka menu sistem");
-        RadioButton b = radio(group, "Mode B: Shizuku. Mencoba menyalakan/mematikan langsung");
-        (Shell.modeB(this) ? b : a).setChecked(true);
-        group.setOnCheckedChangeListener((g, id) -> {
-            getSharedPreferences("cc", MODE_PRIVATE).edit()
-                    .putBoolean("modeB", id == b.getId()).apply();
-            update();
-        });
-        root.addView(group);
-        status = text(root, "");
-        add(root, "Izinkan Shizuku (khusus Mode B)", () -> {
+        title("Warna tombol", 20);
+        colors();
+
+        title("Notifikasi", 20);
+        toggle("Popup notifikasi", "popup", true);
+        toggle("Suara notifikasi", "sound", true);
+        toggle("Sembunyikan isi pesan", "hideContent", false);
+        toggle("Sembunyikan popup saat layar penuh", "hideFullscreen", true);
+        toggle("Geser kiri atas untuk pusat notifikasi", "leftSwipe", true);
+        button("Pilih aplikasi yang boleh muncul", this::apps);
+        note("Agar tidak dobel, matikan suara dan notifikasi mengambang bawaan "
+                + "di pengaturan tiap aplikasi.");
+
+        title("Mode koneksi", 20);
+        boolean b = Prefs.is(this, "modeB", false);
+        button((b ? "" : "Dipakai: ") + "Mode A, membuka menu sistem", () -> mode(false));
+        button((b ? "Dipakai: " : "") + "Mode B, Shizuku", () -> mode(true));
+        if (b) status("Shizuku siap", Shell.ready(), () -> {
             try {
                 if (!Shizuku.pingBinder()) {
-                    Toast.makeText(this, "Pasang dan jalankan aplikasi Shizuku dahulu",
+                    Toast.makeText(this, "Jalankan aplikasi Shizuku dahulu",
                             Toast.LENGTH_LONG).show();
-                } else if (!Shell.ready()) {
+                } else {
                     Shizuku.requestPermission(2);
                 }
             } catch (Throwable e) {
                 Toast.makeText(this, "Shizuku tidak tersedia", Toast.LENGTH_SHORT).show();
             }
-            update();
         });
-
-        ScrollView scroll = new ScrollView(this);
-        scroll.addView(root);
-        setContentView(scroll);
-        Shizuku.addRequestPermissionResultListener(result);
     }
 
-    @Override protected void onResume() {
-        super.onResume();
-        update();
+    @SuppressWarnings("deprecation")
+    private boolean running() {
+        for (ActivityManager.RunningServiceInfo s : getSystemService(ActivityManager.class)
+                .getRunningServices(50)) {
+            if (OverlayService.class.getName().equals(s.service.getClassName())) return true;
+        }
+        return false;
     }
 
-    @Override protected void onDestroy() {
-        Shizuku.removeRequestPermissionResultListener(result);
-        super.onDestroy();
+    private void permissions() {
+        List<String> p = new ArrayList<>();
+        p.add(Manifest.permission.ACCESS_FINE_LOCATION);
+        p.add(Manifest.permission.ACCESS_COARSE_LOCATION);
+        if (Build.VERSION.SDK_INT >= 31) p.add(Manifest.permission.BLUETOOTH_CONNECT);
+        if (Build.VERSION.SDK_INT >= 33) p.add(Manifest.permission.POST_NOTIFICATIONS);
+        requestPermissions(p.toArray(new String[0]), 1);
     }
 
-    private void update() {
-        if (status == null) return;
-        status.setText(!Shell.modeB(this) ? "Mode A aktif"
-                : Shell.ready() ? "Mode B aktif, Shizuku siap"
-                : "Mode B dipilih, tetapi Shizuku belum siap");
+    private void mode(boolean b) {
+        Prefs.of(this).edit().putBoolean("modeB", b).commit();
+        build();
     }
 
-    private TextView text(LinearLayout root, String value) {
+    private void apps() {
+        Map<String, String> apps = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        Intent launcher = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
+        for (ResolveInfo r : getPackageManager().queryIntentActivities(launcher, 0)) {
+            String pkg = r.activityInfo.packageName;
+            if (!pkg.equals(getPackageName())) {
+                apps.put(r.loadLabel(getPackageManager()) + "\n" + pkg, pkg);
+            }
+        }
+        String[] labels = apps.keySet().toArray(new String[0]);
+        Set<String> blocked = Prefs.blocked(this);
+        boolean[] checked = new boolean[labels.length];
+        for (int i = 0; i < labels.length; i++) {
+            checked[i] = !blocked.contains(apps.get(labels[i]));
+        }
+        String[] names = new String[labels.length];
+        for (int i = 0; i < labels.length; i++) names[i] = labels[i].split("\n")[0];
+        new AlertDialog.Builder(this).setTitle("Popup dan suara untuk")
+                .setMultiChoiceItems(names, checked, (d, i, on) -> {
+                    if (on) blocked.remove(apps.get(labels[i]));
+                    else blocked.add(apps.get(labels[i]));
+                })
+                .setPositiveButton("Simpan", (d, w) ->
+                        Prefs.of(this).edit().putStringSet("blocked", blocked).commit())
+                .setNegativeButton("Batal", null).show();
+    }
+
+    private void colors() {
+        int chosen = Prefs.of(this).getInt("color", 0);
+        LinearLayout row = null;
+        for (int i = 0; i < Theme.COLORS.length; i++) {
+            if (i % 4 == 0) {
+                row = new LinearLayout(this);
+                root.addView(row, new LinearLayout.LayoutParams(-1, -2));
+            }
+            LinearLayout item = new LinearLayout(this);
+            item.setOrientation(LinearLayout.VERTICAL);
+            item.setGravity(Gravity.CENTER);
+            item.setPadding(0, dp(8), 0, dp(4));
+            View dot = new View(this);
+            GradientDrawable d = new GradientDrawable();
+            d.setShape(GradientDrawable.OVAL);
+            d.setColor(Theme.COLORS[i]);
+            d.setStroke(dp(i == chosen ? 4 : 1), i == chosen ? 0xFF37D98A : 0x80FFFFFF);
+            dot.setBackground(d);
+            item.addView(dot, new LinearLayout.LayoutParams(dp(48), dp(48)));
+            TextView name = label(Theme.NAMES[i], 12, MUTED);
+            name.setGravity(Gravity.CENTER);
+            item.addView(name);
+            int index = i;
+            item.setContentDescription("Warna " + Theme.NAMES[i]);
+            item.setOnClickListener(v -> {
+                Prefs.of(this).edit().putInt("color", index).commit();
+                int y = scroll.getScrollY();
+                build();
+                scroll.post(() -> scroll.scrollTo(0, y));
+            });
+            row.addView(item, new LinearLayout.LayoutParams(
+                    (getResources().getDisplayMetrics().widthPixels - dp(36)) / 4, -2));
+        }
+    }
+
+    private TextView label(String value, int size, int color) {
         TextView t = new TextView(this);
         t.setText(value);
-        t.setTextSize(16);
-        root.addView(t);
+        t.setTextSize(size);
+        t.setTextColor(color);
         return t;
     }
 
-    private RadioButton radio(RadioGroup group, String value) {
-        RadioButton r = new RadioButton(this);
-        r.setId(android.view.View.generateViewId());
-        r.setText(value);
-        group.addView(r);
-        return r;
+    private void title(String value, int size) {
+        TextView t = label(value, size, Color.WHITE);
+        t.setTypeface(Typeface.DEFAULT_BOLD);
+        t.setPadding(0, dp(16), 0, dp(6));
+        root.addView(t);
     }
 
-    private void add(LinearLayout root, String text, Runnable action) {
-        Button b = new Button(this);
-        b.setText(text);
-        b.setAllCaps(false);
-        b.setOnClickListener(v -> action.run());
-        root.addView(b);
+    private void note(String value) {
+        TextView t = label(value, 13, MUTED);
+        t.setPadding(0, dp(4), 0, dp(4));
+        root.addView(t);
+    }
+
+    private LinearLayout card() {
+        LinearLayout c = new LinearLayout(this);
+        c.setGravity(Gravity.CENTER_VERTICAL);
+        c.setPadding(dp(16), dp(14), dp(16), dp(14));
+        GradientDrawable d = new GradientDrawable();
+        d.setColor(CARD);
+        d.setCornerRadius(dp(22));
+        c.setBackground(d);
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2);
+        p.topMargin = dp(8);
+        root.addView(c, p);
+        return c;
+    }
+
+    private void row(String name, String detail, int dot, Runnable click) {
+        LinearLayout c = card();
+        View v = new View(this);
+        GradientDrawable d = new GradientDrawable();
+        d.setShape(GradientDrawable.OVAL);
+        d.setColor(dot);
+        v.setBackground(d);
+        c.addView(v, new LinearLayout.LayoutParams(dp(12), dp(12)));
+        LinearLayout words = new LinearLayout(this);
+        words.setOrientation(LinearLayout.VERTICAL);
+        words.setPadding(dp(14), 0, 0, 0);
+        words.addView(label(name, 15, Color.WHITE));
+        words.addView(label(detail, 13, MUTED));
+        c.addView(words, new LinearLayout.LayoutParams(0, -2, 1));
+        c.setOnClickListener(x -> click.run());
+    }
+
+    private void status(String name, boolean ok, Runnable click) {
+        row(name, ok ? "Siap" : "Ketuk untuk memperbaiki", ok ? 0xFF37D98A : 0xFFFF6B5E, click);
+    }
+
+    private void manual(String name, Runnable click) {
+        row(name, "Ketuk, lalu periksa secara manual", 0xFF8B93B8, click);
+    }
+
+    private void button(String name, Runnable click) {
+        LinearLayout c = card();
+        c.addView(label(name, 15, Color.WHITE));
+        c.setOnClickListener(v -> click.run());
+    }
+
+    private void toggle(String name, String key, boolean fallback) {
+        LinearLayout c = card();
+        Switch s = new Switch(this);
+        s.setText(name);
+        s.setTextColor(Color.WHITE);
+        s.setTextSize(15);
+        s.setChecked(Prefs.is(this, key, fallback));
+        s.setOnCheckedChangeListener((v, on) -> {
+            Prefs.of(this).edit().putBoolean(key, on).commit();
+            if (key.equals("leftSwipe")) {
+                sendBroadcast(new Intent(OverlayService.REFRESH).setPackage(getPackageName()));
+            }
+        });
+        c.addView(s, new LinearLayout.LayoutParams(-1, -2));
     }
 
     private void open(String action, boolean forPackage) {
@@ -148,4 +316,6 @@ public class MainActivity extends Activity {
         try { startActivity(i); }
         catch (Exception e) { Toast.makeText(this, "Menu tidak tersedia", Toast.LENGTH_SHORT).show(); }
     }
+
+    private int dp(int v) { return Math.round(v * getResources().getDisplayMetrics().density); }
 }

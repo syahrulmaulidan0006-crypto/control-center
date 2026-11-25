@@ -36,7 +36,7 @@ class GlassSwitch extends View {
         Glass.draw(c, paint, track, h / 2, d, 0x33FFFFFF);
         paint.setColor((color & 0x00FFFFFF) | (Math.round(230 * position) << 24));
         c.drawRoundRect(track, h / 2, h / 2, paint);
-        paint.setColor(0xFFFFFFFF);
+        paint.setColor(position > 0.5f && color == Theme.COLORS[4] ? 0xFF1A1D29 : 0xFFFFFFFF);
         float r = h / 2 - 3 * d;
         c.drawCircle(h / 2 + (w - h) * position, h / 2, r, paint);
     }

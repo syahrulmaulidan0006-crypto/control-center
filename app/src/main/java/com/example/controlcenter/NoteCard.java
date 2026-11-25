@@ -1,0 +1,156 @@
+package com.example.controlcenter;
+
+import android.content.Context;
+import android.graphics.Color;
+import android.graphics.Outline;
+import android.graphics.drawable.Drawable;
+import android.service.notification.StatusBarNotification;
+import android.text.TextUtils;
+import android.view.Gravity;
+import android.view.MotionEvent;
+import android.view.VelocityTracker;
+import android.view.View;
+import android.view.ViewConfiguration;
+import android.view.ViewOutlineProvider;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+
+/** Kartu notifikasi kaca yang bisa digeser. */
+class NoteCard extends LinearLayout {
+    private float downX, downY;
+    private boolean swiping;
+    private VelocityTracker velocity;
+    private Runnable dismiss, pullDown, swipeUp;
+    final TextView body;
+
+    NoteCard(Context context, StatusBarNotification n, int tint) {
+        super(context);
+        setOrientation(VERTICAL);
+        setPadding(dp(14), dp(14), dp(14), dp(14));
+        setBackground(new Glass(context, 28, tint));
+        setClickable(true);
+
+        LinearLayout row = new LinearLayout(context);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+
+        Drawable photo = Notes.photo(context, n);
+        FrameLayout images = new FrameLayout(context);
+        ImageView main = new ImageView(context);
+        main.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        main.setImageDrawable(photo != null ? photo : Notes.icon(context, n));
+        main.setOutlineProvider(new ViewOutlineProvider() {
+            @Override public void getOutline(View v, Outline o) {
+                o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), dp(13));
+            }
+        });
+        main.setClipToOutline(true);
+        images.addView(main, new FrameLayout.LayoutParams(dp(46), dp(46)));
+        if (photo != null) {
+            ImageView badge = new ImageView(context);
+            badge.setImageDrawable(Notes.icon(context, n));
+            images.addView(badge, new FrameLayout.LayoutParams(dp(20), dp(20),
+                    Gravity.BOTTOM | Gravity.END));
+        }
+        row.addView(images, new LayoutParams(dp(48), dp(48)));
+
+        LinearLayout words = new LinearLayout(context);
+        words.setOrientation(VERTICAL);
+        words.setPadding(dp(12), 0, 0, 0);
+        LinearLayout head = new LinearLayout(context);
+        TextView app = line(Notes.app(context, n.getPackageName()), 12, 0xCCFFFFFF);
+        head.addView(app, new LayoutParams(0, -2, 1));
+        head.addView(line(Notes.age(n.getPostTime()), 12, 0xCCFFFFFF));
+        words.addView(head);
+        TextView title = line(Notes.title(n), 15, Color.WHITE);
+        title.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        words.addView(title);
+        body = line(Notes.body(context, n), 14, Color.WHITE);
+        body.setSingleLine(false);
+        body.setMaxLines(2);
+        words.addView(body);
+        row.addView(words, new LayoutParams(0, -2, 1));
+        addView(row, new LayoutParams(-1, -2));
+    }
+
+    void gestures(Runnable dismiss, Runnable pullDown, Runnable swipeUp) {
+        this.dismiss = dismiss;
+        this.pullDown = pullDown;
+        this.swipeUp = swipeUp;
+    }
+
+    @Override public boolean onInterceptTouchEvent(MotionEvent e) {
+        track(e);
+        return swiping;
+    }
+
+    @Override public boolean onTouchEvent(MotionEvent e) {
+        track(e);
+        int a = e.getActionMasked();
+        float dx = e.getRawX() - downX, dy = e.getRawY() - downY;
+        if (a == MotionEvent.ACTION_MOVE && swiping) {
+            setTranslationX(dx);
+            setAlpha(1 - Math.min(0.8f, Math.abs(dx) / Math.max(1, getWidth())));
+            return true;
+        }
+        if (a == MotionEvent.ACTION_UP || a == MotionEvent.ACTION_CANCEL) {
+            if (swiping) {
+                velocity.computeCurrentVelocity(1000);
+                boolean gone = a == MotionEvent.ACTION_UP && (Math.abs(dx) > getWidth() * 0.4f
+                        || Math.abs(velocity.getXVelocity()) > dp(900));
+                swiping = false;
+                if (gone && dismiss != null) {
+                    animate().translationX(Math.signum(dx) * getWidth() * 1.2f).alpha(0)
+                            .setDuration(180).withEndAction(dismiss).start();
+                } else {
+                    animate().translationX(0).alpha(1).setDuration(220).start();
+                }
+                return true;
+            }
+            if (a == MotionEvent.ACTION_UP && dy > dp(24) && pullDown != null) {
+                pullDown.run();
+                return true;
+            }
+            if (a == MotionEvent.ACTION_UP && dy < -dp(24) && swipeUp != null) {
+                swipeUp.run();
+                return true;
+            }
+        }
+        return super.onTouchEvent(e);
+    }
+
+    private void track(MotionEvent e) {
+        if (e.getActionMasked() == MotionEvent.ACTION_DOWN) {
+            downX = e.getRawX();
+            downY = e.getRawY();
+            swiping = false;
+            if (velocity == null) velocity = VelocityTracker.obtain();
+            velocity.clear();
+        }
+        if (velocity == null) return;
+        MotionEvent raw = MotionEvent.obtain(e);
+        raw.setLocation(e.getRawX(), e.getRawY());
+        velocity.addMovement(raw);
+        raw.recycle();
+        if (!swiping && dismiss != null && e.getActionMasked() == MotionEvent.ACTION_MOVE) {
+            float dx = Math.abs(e.getRawX() - downX), dy = Math.abs(e.getRawY() - downY);
+            if (dx > ViewConfiguration.get(getContext()).getScaledTouchSlop() && dx > dy * 1.3f) {
+                swiping = true;
+                getParent().requestDisallowInterceptTouchEvent(true);
+            }
+        }
+    }
+
+    private TextView line(String value, int size, int color) {
+        TextView t = new TextView(getContext());
+        t.setText(value);
+        t.setTextSize(size);
+        t.setTextColor(color);
+        t.setSingleLine(true);
+        t.setEllipsize(TextUtils.TruncateAt.END);
+        return t;
+    }
+
+    private int dp(int v) { return Math.round(v * getResources().getDisplayMetrics().density); }
+}

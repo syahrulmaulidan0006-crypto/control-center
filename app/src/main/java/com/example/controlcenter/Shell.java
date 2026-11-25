@@ -34,7 +34,7 @@ final class Shell {
     };
 
     static boolean modeB(Context c) {
-        return c.getSharedPreferences("cc", Context.MODE_PRIVATE).getBoolean("modeB", false);
+        return Prefs.is(c, "modeB", false);
     }
 
     static boolean ready() {

@@ -7,8 +7,15 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Intent;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.IntentFilter;
 import android.content.pm.ServiceInfo;
 import android.content.res.Configuration;
+import android.app.KeyguardManager;
+import android.os.PowerManager;
+import android.service.notification.StatusBarNotification;
+import android.view.WindowInsets;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
@@ -25,13 +32,26 @@ public class OverlayService extends AccessibilityService {
     private static final int BACKGROUND = 0x59000000;
 
     private WindowManager wm;
-    private View handle;
-    private Panel panel;
+    private static OverlayService instance;
+    private View handle, leftHandle;
+    private Sheet panel;
+    private Banner banner;
+    private WindowManager.LayoutParams bannerParams;
     private WindowManager.LayoutParams panelParams;
     private Controls controls;
     private ValueAnimator animator;
     private int blur;
     private boolean closing;
+
+    /** Dikirim layar pengaturan saat area geser perlu dibuat ulang. */
+    static final String REFRESH = "com.example.controlcenter.REFRESH";
+    private final BroadcastReceiver refresh = new BroadcastReceiver() {
+        @Override public void onReceive(Context c, Intent i) {
+            removePanel();
+            removeHandles();
+            showHandles();
+        }
+    };
 
     @Override public void onAccessibilityEvent(AccessibilityEvent event) { }
 
@@ -42,8 +62,16 @@ public class OverlayService extends AccessibilityService {
         if (handle != null) return;
         wm = getSystemService(WindowManager.class);
         controls = new Controls(this);
-        showHandle();
+        instance = this;
+        showHandles();
         keepAlive();
+        if (Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(refresh, new IntentFilter(REFRESH), Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(refresh, new IntentFilter(REFRESH));
+        }
+        android.service.notification.NotificationListenerService.requestRebind(
+                new android.content.ComponentName(this, MusicListener.class));
     }
 
     /** Notifikasi latar depan agar sistem tidak mudah mematikan layanan. */
@@ -70,9 +98,11 @@ public class OverlayService extends AccessibilityService {
     }
 
     @Override public void onDestroy() {
+        if (instance != null) unregisterReceiver(refresh);
+        instance = null;
         removePanel();
-        if (handle != null) wm.removeView(handle);
-        handle = null;
+        if (banner != null) removeBanner(banner);
+        removeHandles();
         if (controls != null) controls.release();
         super.onDestroy();
     }
@@ -83,8 +113,20 @@ public class OverlayService extends AccessibilityService {
         // Perubahan mode gelap tidak perlu menutup panel.
         if (handle.getTag().equals(config.orientation)) return;
         removePanel();
-        wm.removeView(handle);
-        showHandle();
+        removeHandles();
+        showHandles();
+    }
+
+    private void showHandles() {
+        handle = showHandle(false);
+        leftHandle = showHandle(true);
+    }
+
+    private void removeHandles() {
+        if (handle != null) wm.removeView(handle);
+        if (leftHandle != null) wm.removeView(leftHandle);
+        handle = null;
+        leftHandle = null;
     }
 
     private int dp(int v) { return Math.round(v * getResources().getDisplayMetrics().density); }
@@ -100,8 +142,9 @@ public class OverlayService extends AccessibilityService {
         return lp;
     }
 
-    /** Area transparan di status bar kanan; panel mengikuti geseran jari. */
-    private void showHandle() {
+    /** Area transparan di status bar: kanan Control Center, kiri pusat notifikasi. */
+    private View showHandle(boolean left) {
+        if (left && !Prefs.is(this, "leftSwipe", true)) return null;
         View area = new View(this);
         area.setTag(getResources().getConfiguration().orientation);
         int width = getResources().getDisplayMetrics().widthPixels * 2 / 5;
@@ -110,7 +153,7 @@ public class OverlayService extends AccessibilityService {
         WindowManager.LayoutParams lp = params(width, height,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                         | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
-        lp.gravity = Gravity.TOP | Gravity.RIGHT;
+        lp.gravity = Gravity.TOP | (left ? Gravity.LEFT : Gravity.RIGHT);
 
         final float[] start = new float[1];
         final boolean[] active = new boolean[1];
@@ -131,7 +174,7 @@ public class OverlayService extends AccessibilityService {
             if (a == MotionEvent.ACTION_MOVE) {
                 if (!active[0] && dy > dp(8)) {
                     active[0] = true;
-                    addPanel();
+                    addPanel(left);
                 }
                 if (active[0]) drag(Math.min(1f, dy / dp(280)));
             } else if (a == MotionEvent.ACTION_UP || a == MotionEvent.ACTION_CANCEL) {
@@ -144,13 +187,14 @@ public class OverlayService extends AccessibilityService {
             }
             return true;
         });
-        handle = area;
-        wm.addView(handle, lp);
+        wm.addView(area, lp);
+        return area;
     }
 
-    private void addPanel() {
+    private void addPanel(boolean notifications) {
         removePanel();
-        panel = new Panel(this, controls);
+        if (banner != null) removeBanner(banner);
+        panel = notifications ? new Center(this, controls) : new Panel(this, controls);
         panel.setBackground(new ColorDrawable(BACKGROUND));
         panelParams = params(-1, -1, WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
         // Efek blur kaca hanya didukung Android 12+ (dan tergantung perangkat).
@@ -172,6 +216,54 @@ public class OverlayService extends AccessibilityService {
         panelParams.flags ^= flag;
         panelParams.softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN;
         wm.updateViewLayout(panel, panelParams);
+    }
+
+    /** Tampilkan popup notifikasi bila keadaan layar memungkinkan. */
+    static void banner(StatusBarNotification note) {
+        if (instance != null) instance.showBanner(note);
+    }
+
+    private void showBanner(StatusBarNotification note) {
+        if (!Prefs.is(this, "popup", true) || panel != null) return;
+        if (!getSystemService(PowerManager.class).isInteractive()
+                || getSystemService(KeyguardManager.class).isKeyguardLocked()) return;
+        if (Prefs.is(this, "hideFullscreen", true) && fullscreen()) return;
+        // Jangan ganti popup yang sedang dipakai mengetik balasan.
+        if (banner != null) {
+            if ((bannerParams.flags & WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE) == 0) return;
+            removeBanner(banner);
+        }
+        Banner next = new Banner(this, note);
+        bannerParams = params(-1, -2, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE);
+        bannerParams.gravity = Gravity.TOP;
+        int id = getResources().getIdentifier("status_bar_height", "dimen", "android");
+        bannerParams.y = id > 0 ? getResources().getDimensionPixelSize(id) : dp(28);
+        wm.addView(next, bannerParams);
+        banner = next;
+        next.enter();
+    }
+
+    private boolean fullscreen() {
+        if (getResources().getConfiguration().orientation
+                == Configuration.ORIENTATION_LANDSCAPE) return true;
+        if (Build.VERSION.SDK_INT >= 30 && handle != null
+                && handle.getRootWindowInsets() != null) {
+            return !handle.getRootWindowInsets().isVisible(WindowInsets.Type.statusBars());
+        }
+        return false;
+    }
+
+    void bannerKeyboard(Banner target) {
+        if (banner != target) return;
+        bannerParams.flags &= ~WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+        bannerParams.flags |= WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL;
+        wm.updateViewLayout(banner, bannerParams);
+    }
+
+    void removeBanner(Banner target) {
+        if (banner != target) return;
+        wm.removeView(banner);
+        banner = null;
     }
 
     void drag(float progress) {

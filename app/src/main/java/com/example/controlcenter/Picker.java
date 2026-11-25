@@ -51,12 +51,13 @@ class Picker extends FrameLayout {
         badge.setImageResource(item.icon);
         badge.setPadding(dp(11), dp(11), dp(11), dp(11));
         badge.setBackground(new Glass(context, 30,
-                (item.color & 0x00FFFFFF) | 0xCC000000));
+                Theme.accent(context)));
+        badge.setColorFilter(Theme.onAccent(context));
         head.addView(badge, new LinearLayout.LayoutParams(dp(48), dp(48)));
         TextView title = text(item.label, 20, Color.WHITE);
         title.setPadding(dp(14), 0, 0, 0);
         head.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
-        GlassSwitch toggle = new GlassSwitch(context, item.color, controls.isOn(item));
+        GlassSwitch toggle = new GlassSwitch(context, Theme.accent(context), controls.isOn(item));
         toggle.setContentDescription("Nyalakan atau matikan " + item.label);
         toggle.setOnClickListener(v -> controls.click(item));
         head.addView(toggle, new LinearLayout.LayoutParams(dp(56), dp(32)));
@@ -222,7 +223,8 @@ class Picker extends FrameLayout {
         LinearLayout item = new LinearLayout(getContext());
         item.setGravity(Gravity.CENTER_VERTICAL);
         item.setPadding(dp(12), dp(10), dp(12), dp(10));
-        item.setBackground(new Glass(getContext(), 22, active ? 0x802F8CFF : 0x14FFFFFF));
+        item.setBackground(new Glass(getContext(), 22, active
+                ? Theme.alpha(Theme.accent(getContext()), 0x66) : 0x14FFFFFF));
         item.setOnClickListener(v -> click.run());
         ImageView image = new ImageView(getContext());
         image.setImageResource(icon);
