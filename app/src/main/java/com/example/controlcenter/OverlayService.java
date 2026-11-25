@@ -2,6 +2,12 @@ package com.example.controlcenter;
 
 import android.accessibilityservice.AccessibilityService;
 import android.animation.ValueAnimator;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.content.Intent;
+import android.content.pm.ServiceInfo;
 import android.content.res.Configuration;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.ColorDrawable;
@@ -37,6 +43,30 @@ public class OverlayService extends AccessibilityService {
         wm = getSystemService(WindowManager.class);
         controls = new Controls(this);
         showHandle();
+        keepAlive();
+    }
+
+    /** Notifikasi latar depan agar sistem tidak mudah mematikan layanan. */
+    private void keepAlive() {
+        try {
+            getSystemService(NotificationManager.class).createNotificationChannel(
+                    new NotificationChannel("cc", "Control Center",
+                            NotificationManager.IMPORTANCE_MIN));
+            Notification n = new Notification.Builder(this, "cc")
+                    .setContentTitle("Control Center aktif")
+                    .setSmallIcon(R.drawable.ic_settings)
+                    .setContentIntent(PendingIntent.getActivity(this, 0,
+                            new Intent(this, MainActivity.class),
+                            PendingIntent.FLAG_IMMUTABLE))
+                    .build();
+            if (Build.VERSION.SDK_INT >= 34) {
+                startForeground(1, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+            } else {
+                startForeground(1, n);
+            }
+        } catch (Exception ignored) {
+            // Panel tetap bekerja tanpa notifikasi.
+        }
     }
 
     @Override public void onDestroy() {

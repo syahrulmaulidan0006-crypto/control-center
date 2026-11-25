@@ -7,7 +7,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
-import android.graphics.drawable.GradientDrawable;
 import android.net.ConnectivityManager;
 import android.net.NetworkCapabilities;
 import android.net.wifi.ScanResult;
@@ -20,6 +19,7 @@ import android.view.Gravity;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -36,25 +36,42 @@ class Picker extends FrameLayout {
         super(context);
         this.controls = controls;
         this.close = close;
-        setBackgroundColor(0x99000000);
+        setBackgroundColor(0x33000000);
         setOnClickListener(v -> close.run());
 
         LinearLayout card = new LinearLayout(context);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setClickable(true);
-        card.setPadding(dp(20), dp(20), dp(20), dp(14));
-        GradientDrawable back = new GradientDrawable();
-        back.setColor(0xE6232838);
-        back.setCornerRadius(dp(34));
-        back.setStroke(dp(1), 0x40FFFFFF);
-        card.setBackground(back);
+        card.setPadding(dp(18), dp(20), dp(18), dp(16));
+        card.setBackground(new Glass(context, 40, 0x4D1B2440));
 
+        LinearLayout head = new LinearLayout(context);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        ImageView badge = new ImageView(context);
+        badge.setImageResource(item.icon);
+        badge.setPadding(dp(11), dp(11), dp(11), dp(11));
+        badge.setBackground(new Glass(context, 30,
+                (item.color & 0x00FFFFFF) | 0xCC000000));
+        head.addView(badge, new LinearLayout.LayoutParams(dp(48), dp(48)));
         TextView title = text(item.label, 20, Color.WHITE);
-        title.setPadding(dp(4), 0, 0, dp(10));
-        card.addView(title);
+        title.setPadding(dp(14), 0, 0, 0);
+        head.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
+        GlassSwitch toggle = new GlassSwitch(context, item.color, controls.isOn(item));
+        toggle.setContentDescription("Nyalakan atau matikan " + item.label);
+        toggle.setOnClickListener(v -> controls.click(item));
+        head.addView(toggle, new LinearLayout.LayoutParams(dp(56), dp(32)));
+        card.addView(head);
+        toggle.postDelayed(new Runnable() {
+            @Override public void run() {
+                if (!toggle.isAttachedToWindow()) return;
+                toggle.setOn(controls.isOn(item));
+                toggle.postDelayed(this, 500);
+            }
+        }, 500);
 
         list = new LinearLayout(context);
         list.setOrientation(LinearLayout.VERTICAL);
+        list.setPadding(0, dp(6), 0, 0);
         ScrollView scroll = new ScrollView(context) {
             @Override protected void onMeasure(int w, int h) {
                 super.onMeasure(w, MeasureSpec.makeMeasureSpec(
@@ -62,6 +79,7 @@ class Picker extends FrameLayout {
                         MeasureSpec.AT_MOST));
             }
         };
+        scroll.setVerticalScrollBarEnabled(false);
         scroll.addView(list);
         card.addView(scroll, new LinearLayout.LayoutParams(-1, -2));
 
@@ -72,8 +90,14 @@ class Picker extends FrameLayout {
         Intent settings = item == Item.WIFI ? new Intent(Settings.ACTION_WIFI_SETTINGS)
                 : item == Item.BLUETOOTH ? new Intent(Settings.ACTION_BLUETOOTH_SETTINGS)
                 : new Intent(Settings.ACTION_DATA_ROAMING_SETTINGS);
-        TextView more = row(card, "Pengaturan lengkap", null, () -> controls.launch(settings));
+        TextView more = text("Pengaturan lengkap", 14, Color.WHITE);
         more.setGravity(Gravity.CENTER);
+        more.setPadding(0, dp(13), 0, dp(13));
+        more.setBackground(new Glass(context, 30, 0x1FFFFFFF));
+        more.setOnClickListener(v -> controls.launch(settings));
+        LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(-1, -2);
+        mp.topMargin = dp(14);
+        card.addView(more, mp);
         addView(card, new LayoutParams(width, -2, Gravity.CENTER));
     }
 
@@ -82,10 +106,6 @@ class Picker extends FrameLayout {
     }
 
     private void wifi() {
-        row(list, controls.isOn(Item.WIFI) ? "Matikan Wi-Fi" : "Nyalakan Wi-Fi", null, () -> {
-            controls.click(Item.WIFI);
-            close.run();
-        });
         if (!granted(Manifest.permission.ACCESS_FINE_LOCATION)) {
             note("Beri izin lokasi di aplikasi untuk melihat daftar jaringan");
             return;
@@ -106,7 +126,7 @@ class Picker extends FrameLayout {
                 int bars = WifiManager.calculateSignalLevel(r.level, 4) + 1;
                 String detail = (here ? "Tersambung, " : "") + "sinyal " + bars + "/4"
                         + ("open".equals(type) ? ", terbuka" : ", terkunci");
-                row(list, r.SSID, detail, () -> choose(r.SSID, type));
+                row(R.drawable.ic_wifi, r.SSID, detail, here, () -> choose(r.SSID, type));
             }
             if (found.isEmpty()) note("Jaringan belum terlihat. Pastikan Wi-Fi dan lokasi aktif");
         } catch (SecurityException e) {
@@ -137,7 +157,7 @@ class Picker extends FrameLayout {
         input.setSingleLine(true);
         input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         list.addView(input, new LinearLayout.LayoutParams(-1, -2));
-        row(list, "Sambungkan", null, () -> {
+        row(R.drawable.ic_wifi, "Sambungkan", "Ketuk setelah mengisi sandi", true, () -> {
             String password = input.getText().toString();
             if (password.length() < 8) { controls.toast("Minimal 8 karakter"); return; }
             connect(ssid, type, password);
@@ -155,8 +175,6 @@ class Picker extends FrameLayout {
     }
 
     private void bluetooth() {
-        row(list, controls.isOn(Item.BLUETOOTH) ? "Matikan Bluetooth" : "Nyalakan Bluetooth",
-                null, () -> { controls.click(Item.BLUETOOTH); close.run(); });
         if (Build.VERSION.SDK_INT >= 31 && !granted(Manifest.permission.BLUETOOTH_CONNECT)) {
             note("Beri izin Bluetooth di aplikasi untuk melihat perangkat");
             return;
@@ -165,7 +183,7 @@ class Picker extends FrameLayout {
             int count = 0;
             for (BluetoothDevice d : getContext().getSystemService(BluetoothManager.class)
                     .getAdapter().getBondedDevices()) {
-                row(list, d.getName(), "Tersimpan",
+                row(R.drawable.ic_bluetooth, d.getName(), "Tersimpan", false,
                         () -> controls.launch(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS)));
                 count++;
             }
@@ -181,11 +199,9 @@ class Picker extends FrameLayout {
         NetworkCapabilities c = net.getNetworkCapabilities(net.getActiveNetwork());
         boolean using = c != null && c.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR);
         String name = phone.getNetworkOperatorName();
-        note("Operator: " + (name.isEmpty() ? "tidak terdeteksi" : name));
-        note(using ? "Internet sedang memakai data seluler"
-                : "Internet tidak sedang memakai data seluler");
-        row(list, controls.isOn(Item.DATA) ? "Matikan data seluler" : "Nyalakan data seluler",
-                null, () -> { controls.click(Item.DATA); close.run(); });
+        row(R.drawable.ic_data, name.isEmpty() ? "Operator tidak terdeteksi" : name,
+                using ? "Sedang dipakai untuk internet" : "Tidak sedang dipakai", using,
+                () -> controls.launch(new Intent(Settings.ACTION_DATA_ROAMING_SETTINGS)));
     }
 
     private TextView text(String value, int size, int color) {
@@ -202,18 +218,28 @@ class Picker extends FrameLayout {
         list.addView(t);
     }
 
-    private TextView row(LinearLayout parent, String name, String detail, Runnable click) {
-        TextView t = text(detail == null ? name : name + "\n" + detail, 15, Color.WHITE);
-        t.setPadding(dp(16), dp(12), dp(16), dp(12));
-        GradientDrawable d = new GradientDrawable();
-        d.setColor(0x24FFFFFF);
-        d.setCornerRadius(dp(18));
-        t.setBackground(d);
-        t.setOnClickListener(v -> click.run());
+    private void row(int icon, String name, String detail, boolean active, Runnable click) {
+        LinearLayout item = new LinearLayout(getContext());
+        item.setGravity(Gravity.CENTER_VERTICAL);
+        item.setPadding(dp(12), dp(10), dp(12), dp(10));
+        item.setBackground(new Glass(getContext(), 22, active ? 0x802F8CFF : 0x14FFFFFF));
+        item.setOnClickListener(v -> click.run());
+        ImageView image = new ImageView(getContext());
+        image.setImageResource(icon);
+        image.setPadding(dp(7), dp(7), dp(7), dp(7));
+        item.addView(image, new LinearLayout.LayoutParams(dp(36), dp(36)));
+        LinearLayout words = new LinearLayout(getContext());
+        words.setOrientation(LinearLayout.VERTICAL);
+        words.setPadding(dp(10), 0, 0, 0);
+        TextView first = text(name, 15, Color.WHITE);
+        first.setSingleLine(true);
+        first.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        words.addView(first);
+        words.addView(text(detail, 12, 0xB3FFFFFF));
+        item.addView(words, new LinearLayout.LayoutParams(0, -2, 1));
         LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2);
         p.topMargin = dp(8);
-        parent.addView(t, p);
-        return t;
+        list.addView(item, p);
     }
 
     private int dp(int v) { return Math.round(v * getResources().getDisplayMetrics().density); }

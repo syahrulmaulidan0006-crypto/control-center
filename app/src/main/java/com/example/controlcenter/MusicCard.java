@@ -5,7 +5,6 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.Outline;
-import android.graphics.drawable.GradientDrawable;
 import android.media.AudioManager;
 import android.media.MediaMetadata;
 import android.media.session.MediaController;
@@ -113,11 +112,11 @@ class MusicCard extends LinearLayout {
 
         LinearLayout buttons = new LinearLayout(context);
         buttons.setGravity(Gravity.CENTER);
-        button(buttons, R.drawable.ic_previous, "Sebelumnya", control,
+        button(buttons, R.drawable.ic_previous, "Sebelumnya",
                 KeyEvent.KEYCODE_MEDIA_PREVIOUS);
-        play = button(buttons, R.drawable.ic_play, "Putar atau jeda", control,
+        play = button(buttons, R.drawable.ic_play, "Putar atau jeda",
                 KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE);
-        button(buttons, R.drawable.ic_next, "Berikutnya", control, KeyEvent.KEYCODE_MEDIA_NEXT);
+        button(buttons, R.drawable.ic_next, "Berikutnya", KeyEvent.KEYCODE_MEDIA_NEXT);
         addView(buttons, new LayoutParams(-1, -2));
         refresh();
     }
@@ -190,7 +189,7 @@ class MusicCard extends LinearLayout {
         artist.setVisibility(by == null ? GONE : VISIBLE);
 
         // Warna kartu mengikuti warna rata-rata sampul album.
-        int tint = 0x38FFFFFF;
+        int tint = 0x1FFFFFFF;
         if (cover != null) {
             art.setPadding(0, 0, 0, 0);
             art.setBackground(null);
@@ -198,7 +197,7 @@ class MusicCard extends LinearLayout {
             art.setImageBitmap(cover);
             try {
                 Bitmap one = Bitmap.createScaledBitmap(cover, 1, 1, true);
-                tint = (one.getPixel(0, 0) & 0x00FFFFFF) | 0x80000000;
+                tint = (one.getPixel(0, 0) & 0x00FFFFFF) | 0x66000000;
             } catch (Exception ignored) { }
         } else {
             art.setPadding(dp(10), dp(10), dp(10), dp(10));
@@ -206,11 +205,7 @@ class MusicCard extends LinearLayout {
             art.setScaleType(ImageView.ScaleType.FIT_CENTER);
             art.setImageResource(R.drawable.ic_music);
         }
-        GradientDrawable back = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
-                new int[]{tint, 0x30FFFFFF});
-        back.setCornerRadius(dp(32));
-        back.setStroke(dp(1), 0x40FFFFFF);
-        setBackground(back);
+        setBackground(new Glass(getContext(), 32, tint));
         play.setImageResource(playing() ? R.drawable.ic_pause : R.drawable.ic_play);
         updateProgress();
     }
@@ -231,13 +226,13 @@ class MusicCard extends LinearLayout {
         progress.setProgress((int) Math.max(0, Math.min(1000, position * 1000 / length)));
     }
 
-    private ImageView button(LinearLayout row, int res, String label, int size, int key) {
+    private ImageView button(LinearLayout row, int res, String label, int key) {
         ImageView b = new ImageView(getContext());
         b.setImageResource(res);
         b.setContentDescription(label);
-        b.setPadding(size / 5, size / 5, size / 5, size / 5);
+        b.setPadding(dp(8), dp(8), dp(8), dp(8));
         b.setOnClickListener(v -> send(key));
-        row.addView(b, new LayoutParams(size, size));
+        row.addView(b, new LayoutParams(0, dp(40), 1));
         return b;
     }
 

@@ -2,7 +2,9 @@ package com.example.controlcenter;
 
 import android.content.Context;
 import android.graphics.Color;
-import android.graphics.drawable.GradientDrawable;
+import android.graphics.RenderEffect;
+import android.graphics.Shader;
+import android.os.Build;
 import android.media.AudioManager;
 import android.provider.Settings;
 import android.util.DisplayMetrics;
@@ -114,14 +116,6 @@ class Panel extends FrameLayout {
         return t;
     }
 
-    private GradientDrawable glass(int color, int radius) {
-        GradientDrawable d = new GradientDrawable();
-        d.setColor(color);
-        d.setCornerRadius(dp(radius));
-        d.setStroke(dp(1), 0x40FFFFFF);
-        return d;
-    }
-
     private void addSection(View v, int w, int h) {
         LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(w, h);
         p.bottomMargin = gap;
@@ -135,7 +129,7 @@ class Panel extends FrameLayout {
         row.setClipChildren(false);
 
         GridLayout card = grid(2);
-        card.setBackground(glass(0x30FFFFFF, 32));
+        card.setBackground(new Glass(getContext(), 32, 0x1FFFFFFF));
         int pad = dp(6);
         card.setPadding(pad, pad, pad, pad);
         int cell = (side - pad * 2) / 2;
@@ -245,7 +239,7 @@ class Panel extends FrameLayout {
         layer.setOnClickListener(v -> collapse());
         GridLayout card = new GridLayout(getContext());
         card.setColumnCount(2);
-        card.setBackground(glass(0x55FFFFFF, 40));
+        card.setBackground(new Glass(getContext(), 40, 0x33FFFFFF));
         card.setPadding(dp(8), dp(16), dp(8), dp(16));
         card.setClickable(true);
         card.setClipChildren(false);
@@ -288,7 +282,8 @@ class Panel extends FrameLayout {
                 return true;
             }
         });
-        scroll.animate().alpha(0.08f).setDuration(260).start();
+        blur(scroll, true);
+        scroll.animate().alpha(0.25f).setDuration(260).start();
     }
 
     private void morph(View card, boolean open, Runnable end) {
@@ -319,6 +314,7 @@ class Panel extends FrameLayout {
         FrameLayout layer = expanded;
         if (layer == null || collapsing) return;
         collapsing = true;
+        blur(scroll, false);
         scroll.animate().alpha(1).setDuration(240).start();
         morph(layer.getChildAt(0), false, () -> {
             removeView(layer);
@@ -337,6 +333,9 @@ class Panel extends FrameLayout {
         if (popup != null) return;
         popup = new Picker(getContext(), controls, item, width, this::closePicker);
         addView(popup, new LayoutParams(-1, -1));
+        View behind = expanded != null ? expanded : scroll;
+        blur(behind, true);
+        behind.animate().alpha(0.2f).setDuration(200).start();
         popup.setAlpha(0);
         popup.animate().alpha(1).setDuration(180).start();
         View card = popup.getChildAt(0);
@@ -351,7 +350,23 @@ class Panel extends FrameLayout {
         if (old == null) return;
         popup = null;
         service.setKeyboard(false);
+        if (expanded != null) {
+            blur(expanded, false);
+            expanded.animate().alpha(1).setDuration(180).start();
+        } else {
+            blur(scroll, false);
+            scroll.animate().alpha(1).setDuration(180).start();
+        }
         old.animate().alpha(0).setDuration(160).withEndAction(() -> removeView(old)).start();
+    }
+
+    /** Konten di belakang dibuat buram (Android 12+). */
+    private void blur(View v, boolean on) {
+        if (Build.VERSION.SDK_INT >= 31) {
+            v.setRenderEffect(on
+                    ? RenderEffect.createBlurEffect(dp(14), dp(14), Shader.TileMode.CLAMP)
+                    : null);
+        }
     }
 
     // ---------------------------------------------------------------- Gerakan
