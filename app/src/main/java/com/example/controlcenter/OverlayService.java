@@ -205,6 +205,7 @@ public class OverlayService extends AccessibilityService {
         removePanel();
         if (banner != null) removeBanner(banner);
         panel = notifications ? new Center(this, controls) : new Panel(this, controls);
+        android.util.Log.i("ControlCenter", "panel dibuka, pusat=" + notifications);
         panel.setBackground(new ColorDrawable(BACKGROUND));
         panelParams = params(-1, -1, WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
         // Efek blur kaca hanya didukung Android 12+ (dan tergantung perangkat).

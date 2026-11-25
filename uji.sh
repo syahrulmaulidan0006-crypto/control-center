@@ -23,6 +23,11 @@ sleep 2; shot popup2
 sleep 8
 W=$(adb shell wm size | grep -o '[0-9]*x' | tr -d x)
 adb shell input swipe $((W*85/100)) 5 $((W*85/100)) 900 250
+sleep 3; shot panel0
+adb logcat -d | grep -E "ControlCenter|AndroidRuntime"
+adb shell input keyevent KEYCODE_BACK; sleep 2
+adb shell input keyevent KEYCODE_HOME; sleep 2
+adb shell input swipe $((W*85/100)) 5 $((W*85/100)) 900 250
 sleep 3; shot panel
 # layar atur tombol
 adb shell input tap 100 150; sleep 2; shot atur
