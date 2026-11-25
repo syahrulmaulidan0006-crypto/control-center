@@ -34,6 +34,10 @@ adb shell input tap 100 150; sleep 2; shot atur
 adb shell input swipe 540 1900 540 400 300; sleep 2; shot atur2
 adb shell input tap 170 1500; sleep 2; shot atur3
 adb shell input keyevent KEYCODE_BACK; sleep 2; shot panel2
+adb shell input tap 100 150; sleep 2
+adb shell input draganddrop 173 460 650 460 900; sleep 2; shot geser
+adb shell input tap 173 700; sleep 2; shot hapus
+adb shell input keyevent KEYCODE_BACK; sleep 2; shot panel3
 adb shell input keyevent KEYCODE_BACK; sleep 2
 adb shell input swipe $((W*15/100)) 5 $((W*15/100)) 900 250
 sleep 3; shot pusat
