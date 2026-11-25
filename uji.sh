@@ -24,10 +24,16 @@ sleep 8
 W=$(adb shell wm size | grep -o '[0-9]*x' | tr -d x)
 adb shell input swipe $((W*85/100)) 5 $((W*85/100)) 900 250
 sleep 3; shot panel
+# layar atur tombol
+adb shell input tap 100 150; sleep 2; shot atur
+adb shell input swipe 540 1900 540 400 300; sleep 2; shot atur2
+adb shell input tap 170 1500; sleep 2; shot atur3
+adb shell input keyevent KEYCODE_BACK; sleep 2; shot panel2
 adb shell input keyevent KEYCODE_BACK; sleep 2
 adb shell input swipe $((W*15/100)) 5 $((W*15/100)) 900 250
 sleep 3; shot pusat
 adb shell input keyevent KEYCODE_BACK; sleep 2
+adb shell am start -a android.settings.SETTINGS; sleep 3
 adb shell settings put system accelerometer_rotation 0
 adb shell settings put system user_rotation 1
 sleep 4

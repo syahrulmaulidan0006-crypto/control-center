@@ -30,6 +30,9 @@ class Panel extends Sheet {
     private final int width, unit, gap;
     private final boolean land;
     private View connections;
+    private GridLayout middle, shortcuts;
+    private final List<TileView> custom = new ArrayList<>();
+    private Editor editor;
     private VerticalSlider light, sound;
     private FrameLayout expanded, popup;
     private boolean collapsing;
@@ -65,6 +68,8 @@ class Panel extends Sheet {
         buildTop();
         buildMiddle();
         buildShortcuts();
+        fill();
+        box.setOnLongClickListener(v -> { edit(); return true; });
 
         FrameLayout wrap = new FrameLayout(service);
         wrap.setPadding(0, dp(land ? 14 : 40), 0, dp(land ? 8 : 40));
@@ -73,7 +78,21 @@ class Panel extends Sheet {
         page.setOrientation(LinearLayout.VERTICAL);
         LinearLayout.LayoutParams statusSize = new LinearLayout.LayoutParams(-1, dp(24));
         statusSize.bottomMargin = dp(land ? 6 : 16);
-        page.addView(new StatusRow(service), statusSize);
+        LinearLayout header = new LinearLayout(service);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        android.widget.ImageView add = new android.widget.ImageView(service);
+        add.setImageResource(R.drawable.ic_plus);
+        add.setContentDescription("Atur tombol");
+        add.setPadding(dp(6), dp(6), dp(6), dp(6));
+        add.setBackground(new Glass(service, 16, 0x26FFFFFF));
+        add.setOnClickListener(v -> edit());
+        LinearLayout.LayoutParams addSize = new LinearLayout.LayoutParams(
+                dp(land ? 24 : 30), dp(land ? 24 : 30));
+        addSize.rightMargin = dp(10);
+        header.addView(add, addSize);
+        header.addView(new StatusRow(service), new LinearLayout.LayoutParams(0, dp(24), 1));
+        statusSize.height = dp(land ? 24 : 30);
+        page.addView(header, statusSize);
         page.addView(box, new LinearLayout.LayoutParams(-1, -2));
         wrap.addView(page, new LayoutParams(width, -2, Gravity.CENTER));
         wrap.setOnClickListener(v -> service.closePanel());
@@ -145,9 +164,18 @@ class Panel extends Sheet {
     private TileView tile(Item item) {
         TileView t = new TileView(getContext(), item);
         t.setOnClickListener(v -> {
-            controls.click(item);
+            // Beri waktu agar gerakan ikon terlihat sebelum panel ditutup.
+            if (item.leaves()) postDelayed(() -> controls.click(item), 240);
+            else controls.click(item);
             postDelayed(() -> refresh(true), 150);
         });
+        if (item.movable() && expanded == null) {
+            t.setOnLongClickListener(v -> {
+                v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+                edit();
+                return true;
+            });
+        }
         if (item == Item.WIFI || item == Item.DATA || item == Item.BLUETOOTH) {
             t.setOnLongClickListener(v -> {
                 v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
@@ -196,7 +224,7 @@ class Panel extends Sheet {
         connections = card;
         row.addView(card, new LinearLayout.LayoutParams(side, side));
 
-        MusicCard music = new MusicCard(getContext(), side, () -> {
+        MusicCard music = new MusicCard(getContext(), side, this::output, () -> {
             controls.toast("Buka aplikasi dan berikan izin akses notifikasi");
             controls.launch(new android.content.Intent(getContext(), MainActivity.class));
         }, service::closePanel);
@@ -207,19 +235,24 @@ class Panel extends Sheet {
         else addSection(row, width, side);
     }
 
+    /** Memilih keluaran suara (speaker, headset, Bluetooth). */
+    private void output(String player) {
+        android.content.Intent volume =
+                new android.content.Intent(Settings.Panel.ACTION_VOLUME);
+        if (player == null) { controls.launch(volume); return; }
+        controls.launch(new android.content.Intent(
+                "com.android.settings.panel.action.MEDIA_OUTPUT")
+                .putExtra("com.android.settings.panel.extra.PACKAGE_NAME", player), volume);
+    }
+
     private void buildMiddle() {
         LinearLayout row = new LinearLayout(getContext());
         row.setClipChildren(false);
         LinearLayout sliders = row;
-        GridLayout grid = grid(2);
-        Item[] list = {Item.ROTATION, Item.DND, Item.TORCH, Item.VIBRATE};
-        for (int i = 0; i < list.length; i++) cell(grid, tile(list[i]), i < 2 ? gap : 0);
+        middle = grid(2);
+        GridLayout grid = middle;
         if (land) {
             row.setOrientation(LinearLayout.VERTICAL);
-            // Kolom kanan kisi tidak memakai jarak tambahan.
-            for (int i = 1; i < grid.getChildCount(); i += 2) {
-                ((GridLayout.LayoutParams) grid.getChildAt(i).getLayoutParams()).rightMargin = 0;
-            }
             row.addView(grid, new LinearLayout.LayoutParams(-2, unit * 2 + gap));
             sliders = new LinearLayout(getContext());
             LinearLayout.LayoutParams under = new LinearLayout.LayoutParams(-1, unit * 2 + gap);
@@ -259,12 +292,62 @@ class Panel extends Sheet {
     }
 
     private void buildShortcuts() {
-        GridLayout grid = grid(4);
-        Item[] all = Item.values();
-        for (int i = Item.CALCULATOR.ordinal(); i < all.length; i++) {
-            cell(grid, tile(all[i]), gap);
+        shortcuts = grid(4);
+        addSection(shortcuts, land ? unit * 4 + gap * 4 : width + gap, -2);
+    }
+
+    /** Empat tombol pertama berada di samping slider, sisanya di kisi bawah. */
+    private void fill() {
+        tiles.removeAll(custom);
+        custom.clear();
+        middle.removeAllViews();
+        shortcuts.removeAllViews();
+        List<Item> order = Item.load(getContext());
+        for (int i = 0; i < Math.max(4, order.size()); i++) {
+            View v;
+            if (i < order.size()) {
+                TileView t = tile(order.get(i));
+                custom.add(t);
+                v = t;
+            } else {
+                v = new View(getContext());
+            }
+            if (i < 4) {
+                cell(middle, v, i < 2 ? gap : 0);
+                // Dalam mode mendatar kolom kanan tidak memakai jarak tambahan.
+                if (land && i % 2 == 1) {
+                    ((GridLayout.LayoutParams) v.getLayoutParams()).rightMargin = 0;
+                }
+            } else {
+                cell(shortcuts, v, gap);
+            }
         }
-        addSection(grid, land ? unit * 4 + gap * 4 : width + gap, -2);
+        refresh(false);
+    }
+
+    // ---------------------------------------------------------------- Atur tombol
+
+    private void edit() {
+        if (editor != null || popup != null || expanded != null) return;
+        editor = new Editor(getContext(), width, land ? 8 : 4, this::closeEditor);
+        addView(editor, new LayoutParams(-1, -1));
+        blur(scroll, true);
+        scroll.animate().alpha(0).setDuration(220).start();
+        editor.setAlpha(0);
+        editor.setScaleX(1.08f);
+        editor.setScaleY(1.08f);
+        editor.animate().alpha(1).scaleX(1).scaleY(1).setDuration(280)
+                .setInterpolator(new DecelerateInterpolator(1.6f)).start();
+    }
+
+    private void closeEditor() {
+        Editor old = editor;
+        if (old == null) return;
+        editor = null;
+        fill();
+        blur(scroll, false);
+        scroll.animate().alpha(1).setDuration(220).start();
+        old.animate().alpha(0).setDuration(180).withEndAction(() -> removeView(old)).start();
     }
 
     private GridLayout grid(int columns) {
@@ -450,10 +533,11 @@ class Panel extends Sheet {
     }
 
     @Override boolean back() {
+        if (editor != null) { closeEditor(); return true; }
         if (popup != null) { closePicker(); return true; }
         if (expanded != null) { collapse(); return true; }
         return false;
     }
 
-    @Override boolean canDrag() { return popup == null && expanded == null; }
+    @Override boolean canDrag() { return popup == null && expanded == null && editor == null; }
 }

@@ -88,6 +88,8 @@ class Controls {
                 case SYNC: return ContentResolver.getMasterSyncAutomatically();
                 case BATTERY: return service.getSystemService(android.os.PowerManager.class)
                         .isPowerSaveMode();
+                case AWAKE: return system(Settings.System.SCREEN_OFF_TIMEOUT, 0) >= AWAKE_TIME;
+                case MUTE: return audio.isStreamMute(AudioManager.STREAM_MUSIC);
                 default: return false;
             }
         } catch (Exception e) {
@@ -148,6 +150,36 @@ class Controls {
             case RECENTS: action(AccessibilityService.GLOBAL_ACTION_RECENTS); break;
             case LOCK: action(AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN); break;
             case POWER: action(AccessibilityService.GLOBAL_ACTION_POWER_DIALOG); break;
+            case AWAKE: awake(); break;
+            case MUTE:
+                try {
+                    audio.adjustStreamVolume(AudioManager.STREAM_MUSIC,
+                            AudioManager.ADJUST_TOGGLE_MUTE, 0);
+                } catch (SecurityException e) { toast("Izin Jangan Ganggu diperlukan"); }
+                break;
+            case VOLUME: launch(new Intent(Settings.Panel.ACTION_VOLUME)); break;
+            case TIMER: launch(new Intent(AlarmClock.ACTION_SHOW_TIMERS),
+                    new Intent(AlarmClock.ACTION_SHOW_ALARMS)); break;
+            case CALENDAR: category(Intent.CATEGORY_APP_CALENDAR); break;
+            case GALLERY: category(Intent.CATEGORY_APP_GALLERY); break;
+            case MUSIC_APP: category(Intent.CATEGORY_APP_MUSIC); break;
+            case BROWSER: category(Intent.CATEGORY_APP_BROWSER); break;
+            case MESSAGES: category(Intent.CATEGORY_APP_MESSAGING); break;
+            case PHONE: launch(new Intent(Intent.ACTION_DIAL)); break;
+            case CONTACTS: category(Intent.CATEGORY_APP_CONTACTS); break;
+            case MAPS: category(Intent.CATEGORY_APP_MAPS); break;
+            case EMAIL: category(Intent.CATEGORY_APP_EMAIL); break;
+            case FILES: category(Intent.CATEGORY_APP_FILES); break;
+            case VOICE: launch(new Intent(MediaStore.Audio.Media.RECORD_SOUND_ACTION),
+                    service.getPackageManager().getLaunchIntentForPackage(
+                            "com.android.soundrecorder")); break;
+            case VIDEO: launch(new Intent(MediaStore.INTENT_ACTION_VIDEO_CAMERA)); break;
+            case SPLIT: action(AccessibilityService.GLOBAL_ACTION_TOGGLE_SPLIT_SCREEN); break;
+            case HOME: action(AccessibilityService.GLOBAL_ACTION_HOME); break;
+            case CAST: launch(new Intent(Settings.ACTION_CAST_SETTINGS)); break;
+            case VPN: launch(new Intent(Settings.ACTION_VPN_SETTINGS)); break;
+            case USAGE: launch(new Intent(Settings.ACTION_DATA_USAGE_SETTINGS),
+                    new Intent(Settings.ACTION_WIRELESS_SETTINGS)); break;
         }
     }
 
@@ -168,6 +200,24 @@ class Controls {
         });
     }
 
+    private static final int AWAKE_TIME = 30 * 60 * 1000;
+
+    /** Layar tidak mati selama 30 menit; ketuk lagi untuk kembali ke waktu semula. */
+    private void awake() {
+        if (!canWrite()) return;
+        if (isOn(Item.AWAKE)) {
+            put(Settings.System.SCREEN_OFF_TIMEOUT, Prefs.of(service).getInt("timeout", 30000));
+        } else {
+            Prefs.of(service).edit().putInt("timeout",
+                    system(Settings.System.SCREEN_OFF_TIMEOUT, 30000)).apply();
+            put(Settings.System.SCREEN_OFF_TIMEOUT, AWAKE_TIME);
+        }
+    }
+
+    private void category(String name) {
+        launch(Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, name));
+    }
+
     private void action(int id) {
         service.closePanel();
         handler.postDelayed(() -> service.performGlobalAction(id), 350);
@@ -183,6 +233,7 @@ class Controls {
 
     void launch(Intent... choices) {
         for (Intent i : choices) {
+            if (i == null) continue;
             try {
                 service.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
                 service.closePanel();
