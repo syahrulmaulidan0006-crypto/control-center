@@ -72,6 +72,7 @@ class Center extends Sheet {
         list.setClipChildren(false);
         FrameLayout wrap = new FrameLayout(service);
         wrap.setClipChildren(false);
+        wrap.setClipToPadding(false);
         wrap.setPadding(0, dp(land ? 20 : 48), 0, dp(land ? 30 : 120));
         wrap.addView(box, new FrameLayout.LayoutParams(width, -2, Gravity.CENTER_HORIZONTAL));
         wrap.setOnClickListener(v -> service.closePanel());
