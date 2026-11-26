@@ -61,13 +61,20 @@ adb shell input tap 540 1085; sleep 2; shot tidur; mode sesudah-pilih-tidur
 tutup; shot ikontidur
 adb shell input tap 163 840; sleep 2; mode sesudah-ketuk-lagi
 adb shell input swipe 163 840 163 840 800; sleep 2
-adb shell input tap 540 1630; sleep 2; shot jadwal; mode jadwal
-tutup
+adb shell input tap 540 1416; sleep 2; shot jadwal; mode jadwal-aktif
+tutup; tutup
+buka 85 250
 adb shell input swipe 411 1335 411 1335 800; sleep 2; shot timer; tutup
 adb shell input swipe 663 963 663 963 800; sleep 2; shot kecerahan; tutup
 adb shell input swipe 225 470 225 470 100; sleep 2; shot kotak
 adb shell input swipe 300 1470 300 1470 800; sleep 2; shot hotspot; tutup; tutup
 adb shell input tap 100 150; sleep 2; shot atur5; tutup; tutup
+# jadwal tidur: pindahkan jam emulator ke dalam lalu ke luar jadwal
+adb root; sleep 5
+adb shell settings put global auto_time 0
+bangun() { adb shell input keyevent KEYCODE_SLEEP; sleep 3; adb shell input keyevent KEYCODE_WAKEUP; sleep 3; adb shell wm dismiss-keyguard; sleep 2; }
+adb shell date 112623302026.00; bangun; mode jadwal-malam
+adb shell date 112706002026.00; bangun; mode jadwal-pagi
 adb logcat -d | grep -E "AndroidRuntime|ControlCenter" | tail -30
 adb shell input keyevent KEYCODE_HOME; sleep 2
 adb shell am start -a android.settings.SETTINGS; sleep 3
