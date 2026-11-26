@@ -1,5 +1,6 @@
 package com.example.controlcenter;
 
+import android.animation.ValueAnimator;
 import android.content.ComponentName;
 import android.content.Context;
 import android.graphics.Bitmap;
@@ -33,7 +34,7 @@ class MusicCard extends LinearLayout {
     private final ImageView art, play, previous, next;
     private final TextView title, artist;
     private MediaController controller;
-    private boolean listening;
+    private boolean listening, fadeArt;
     private Boolean shownPlaying;
     private Runnable onOpen = () -> { };
 
@@ -183,10 +184,7 @@ class MusicCard extends LinearLayout {
             title.setText(heading);
             title.setAlpha(0);
             title.animate().alpha(1).setDuration(320).start();
-            art.setAlpha(0);
-            art.setScaleX(0.8f);
-            art.setScaleY(0.8f);
-            art.animate().alpha(1).scaleX(1).scaleY(1).setDuration(380).start();
+            fadeArt = true;
         }
         artist.setText(by);
         artist.setVisibility(by == null || by.length() == 0 ? GONE : VISIBLE);
@@ -208,6 +206,14 @@ class MusicCard extends LinearLayout {
             art.setScaleType(ImageView.ScaleType.FIT_CENTER);
             art.setImageResource(R.drawable.ic_music);
         }
+        if (fadeArt && isLaidOut()) {
+            // Hanya isi gambar yang dipudarkan, mulai dari yang sudah terlihat.
+            ValueAnimator fade = ValueAnimator.ofInt(60, 255);
+            fade.setDuration(380);
+            fade.addUpdateListener(a -> art.setImageAlpha((int) a.getAnimatedValue()));
+            fade.start();
+        }
+        fadeArt = false;
         setBackground(new Glass(getContext(), 32, tint));
         updatePlay();
     }

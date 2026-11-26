@@ -356,11 +356,25 @@ public class OverlayService extends AccessibilityService {
         if (panel != from || closing || deck.paging()) return false;
         stopAnimation();
         drag(1);
-        Sheet other = from instanceof Center ? new Panel(this, controls)
+        deck.begin(() -> neighbor(from));
+        return true;
+    }
+
+    private Sheet neighbor(Sheet of) {
+        Sheet other = of instanceof Center ? new Panel(this, controls)
                 : new Center(this, controls);
         other.setBackground(new ColorDrawable(BACKGROUND));
-        deck.begin(other);
-        return true;
+        return other;
+    }
+
+    /** Dipanggil setelah panel diam agar pembuatannya tidak mengganggu gerakan. */
+    private void prepareNeighbor() {
+        Deck target = deck;
+        if (target == null) return;
+        target.postDelayed(() -> {
+            if (deck != target || closing || target.paging() || target.prepared()) return;
+            target.prepare(neighbor(panel));
+        }, 80);
     }
 
     void dots(boolean visible) { if (deck != null) deck.dots(visible); }
@@ -372,6 +386,7 @@ public class OverlayService extends AccessibilityService {
         deck.release(velocity, lifted, chosen -> {
             setKeyboard(false);
             panel = chosen;
+            prepareNeighbor();
         });
     }
 
@@ -402,7 +417,7 @@ public class OverlayService extends AccessibilityService {
     void openFully() {
         if (panel == null) return;
         closing = false;
-        animateTo(1, null);
+        animateTo(1, this::prepareNeighbor);
     }
 
     void closePanel() {

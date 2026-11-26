@@ -9,17 +9,23 @@ import android.graphics.Paint;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
+import android.view.VelocityTracker;
 import android.view.View;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.FrameLayout;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /**
  * Wadah dua halaman: pusat notifikasi di kiri dan Control Center di kanan.
  * Halaman mengikuti jari saat digeser ke samping.
  */
 class Deck extends FrameLayout {
-    private Sheet current, next;
+    /** ready: halaman sebelah yang sudah disiapkan tetapi belum terlihat. */
+    private Sheet current, next, ready;
+    private Consumer<Sheet> chosen;
+    private VelocityTracker velocity;
+    private float grabX, grabMoved;
     private final Dots dots;
     private ValueAnimator slide;
     private float moved;
@@ -48,10 +54,25 @@ class Deck extends FrameLayout {
 
     boolean paging() { return next != null; }
 
-    void begin(Sheet other) {
-        next = other;
+    boolean prepared() { return ready != null; }
+
+    /** Halaman sebelah dibuat lebih dulu agar geseran pertama tidak tersendat. */
+    void prepare(Sheet other) {
+        ready = other;
         other.setProgress(1);
+        other.setVisibility(INVISIBLE);
         addView(other, indexOfChild(dots), new LayoutParams(-1, -1));
+    }
+
+    /** other hanya dipakai bila belum ada halaman yang disiapkan. */
+    void begin(Supplier<Sheet> other) {
+        if (ready == null) prepare(other.get());
+        next = ready;
+        ready = null;
+        next.setVisibility(VISIBLE);
+        // Selama meluncur, tiap halaman cukup digambar sekali.
+        current.setLayerType(LAYER_TYPE_HARDWARE, null);
+        next.setLayerType(LAYER_TYPE_HARDWARE, null);
         move(0);
     }
 
@@ -79,34 +100,81 @@ class Deck extends FrameLayout {
         v.setScaleY(1 - 0.08f * away);
     }
 
-    void release(float velocity, boolean lifted, Consumer<Sheet> chosen) {
+    /** Meluncur ke halaman tujuan, melanjutkan kecepatan jari. */
+    void release(float speedX, boolean lifted, Consumer<Sheet> done) {
         if (next == null) return;
-        float speed = velocity * current.pageDirection();
-        float fast = 600 * getResources().getDisplayMetrics().density;
-        boolean go = lifted && speed > -fast && (moved > 0.3f || speed > fast);
-        slide = ValueAnimator.ofFloat(moved, go ? 1 : 0);
-        slide.setDuration(300);
-        slide.setInterpolator(new DecelerateInterpolator(1.8f));
+        chosen = done;
+        float speed = speedX * current.pageDirection();
+        float flick = 350 * getResources().getDisplayMetrics().density;
+        boolean go = lifted && (speed > flick || speed > -flick && moved > 0.35f);
+        float end = go ? 1 : 0;
+        float distance = Math.abs(end - moved), toward = go ? speed : -speed;
+        // Kurva kubik mulai dengan kecepatan 3 x jarak / durasi, sama dengan jari.
+        float millis = toward > flick
+                ? 3000 * distance * Math.max(1, getWidth()) / toward : 260 + 200 * distance;
+        slide = ValueAnimator.ofFloat(moved, end);
+        slide.setDuration((long) Math.max(200, Math.min(440, millis)));
+        slide.setInterpolator(t -> 1 - (1 - t) * (1 - t) * (1 - t));
         slide.addUpdateListener(a -> move((float) a.getAnimatedValue()));
         slide.addListener(new AnimatorListenerAdapter() {
-            @Override public void onAnimationEnd(Animator a) {
-                Sheet gone = go ? current : next;
-                if (go) current = next;
-                next = null;
-                slide = null;
-                removeView(gone);
-                page(current, 0, 0);
-                dots.position = place(current);
-                dots.invalidate();
-                if (go) chosen.accept(current);
-            }
+            @Override public void onAnimationEnd(Animator a) { settle(go); }
         });
         slide.start();
     }
 
+    private void settle(boolean go) {
+        Sheet gone = go ? current : next;
+        if (go) current = next;
+        next = null;
+        slide = null;
+        current.setLayerType(LAYER_TYPE_NONE, null);
+        gone.setLayerType(LAYER_TYPE_NONE, null);
+        page(current, 0, 0);
+        dots.position = place(current);
+        dots.invalidate();
+        if (go) {
+            removeView(gone);
+            chosen.accept(current);
+        } else {
+            // Batal pindah: halaman sebelah disimpan untuk geseran berikutnya.
+            gone.setVisibility(INVISIBLE);
+            ready = gone;
+        }
+    }
+
     @Override public boolean onInterceptTouchEvent(MotionEvent e) {
-        // Abaikan sentuhan baru selagi halaman masih meluncur.
+        // Halaman yang masih meluncur bisa ditangkap lagi dengan jari.
         return slide != null;
+    }
+
+    @Override public boolean onTouchEvent(MotionEvent e) {
+        int a = e.getActionMasked();
+        if (a == MotionEvent.ACTION_DOWN) {
+            if (slide == null) return false;
+            slide.removeAllListeners();
+            slide.cancel();
+            slide = null;
+            grabX = e.getRawX();
+            grabMoved = moved;
+            velocity = VelocityTracker.obtain();
+        }
+        if (velocity == null) return false;
+        MotionEvent raw = MotionEvent.obtain(e);
+        raw.setLocation(e.getRawX(), e.getRawY());
+        velocity.addMovement(raw);
+        raw.recycle();
+        if (a == MotionEvent.ACTION_MOVE) {
+            float f = grabMoved + (e.getRawX() - grabX) * current.pageDirection()
+                    / Math.max(1, getWidth());
+            move(Math.max(0, Math.min(1, f)));
+        } else if (a == MotionEvent.ACTION_UP || a == MotionEvent.ACTION_CANCEL) {
+            velocity.computeCurrentVelocity(1000);
+            float speed = velocity.getXVelocity();
+            velocity.recycle();
+            velocity = null;
+            release(speed, a == MotionEvent.ACTION_UP, chosen);
+        }
+        return true;
     }
 
     @Override public boolean dispatchKeyEvent(KeyEvent e) { return current.dispatchKeyEvent(e); }

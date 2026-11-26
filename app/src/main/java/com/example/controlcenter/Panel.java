@@ -77,6 +77,7 @@ class Panel extends Sheet {
         wrap.setClipChildren(false);
         LinearLayout page = new LinearLayout(service);
         page.setOrientation(LinearLayout.VERTICAL);
+        page.setClipChildren(false);
         LinearLayout.LayoutParams statusSize = new LinearLayout.LayoutParams(-1, dp(24));
         statusSize.bottomMargin = dp(land ? 6 : 16);
         LinearLayout header = new LinearLayout(service);
@@ -253,6 +254,7 @@ class Panel extends Sheet {
             row.setOrientation(LinearLayout.VERTICAL);
             row.addView(grid, new LinearLayout.LayoutParams(-2, unit * 2 + gap));
             sliders = new LinearLayout(getContext());
+            sliders.setClipChildren(false);
             LinearLayout.LayoutParams under = new LinearLayout.LayoutParams(-1, unit * 2 + gap);
             under.topMargin = gap;
             row.addView(sliders, under);
