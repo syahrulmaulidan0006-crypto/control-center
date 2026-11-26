@@ -45,6 +45,33 @@ adb shell cmd notification post -t Budi pesan2 'Halo_satu'; sleep 3
 adb shell cmd notification post -t Sari pesan3 'Halo_dua'; sleep 8
 buka 15 80; shot pusat; tutup
 adb shell input keyevent KEYCODE_HOME; sleep 2
+# --- versi 16
+echo "--- popup beruntun"
+adb shell cmd notification post -t Andi cepat1 'Satu'; sleep 1
+adb shell cmd notification post -t Andi cepat2 'Dua'; sleep 1; shot ganti
+sleep 10
+echo "jendela sisa: $(adb shell dumpsys window windows | grep -c 'Window #.*controlcenter')"
+adb shell cmd notification allow_dnd com.example.controlcenter
+buka 85 250
+adb shell input swipe 150 1900 950 1900 2500 & sleep 1.3; shot geser1; wait; sleep 2; shot geser2
+adb shell input swipe 950 1500 150 1500 200; sleep 2; shot geser3
+adb shell input swipe 150 1900 950 1900 200; sleep 2
+adb shell input swipe 800 700 150 700 200; sleep 2; shot geser4
+adb shell input swipe 414 840 414 840 800; sleep 2; shot fokus
+adb shell input tap 540 1068; sleep 2; shot tidur
+adb shell dumpsys notification | grep -m3 -E "mZenMode="
+echo "terang: $(adb shell settings get system screen_brightness)"
+tutup; shot sesudahtidur
+adb shell input tap 414 840; sleep 2
+adb shell dumpsys notification | grep -m3 -E "mZenMode="
+echo "terang: $(adb shell settings get system screen_brightness)"
+adb shell input swipe 663 963 663 963 800; sleep 2; shot kecerahan; tutup
+adb shell input swipe 165 1086 165 1086 800; sleep 2; shot senter; tutup
+adb shell input swipe 663 1335 663 1335 800; sleep 2; shot timer; tutup
+adb shell input swipe 800 285 800 285 100; sleep 2; shot kotak
+adb shell input swipe 700 1400 700 1400 800; sleep 2; shot hotspot; tutup; tutup; tutup
+adb logcat -d | grep -E "AndroidRuntime|ControlCenter" | tail -30
+adb shell input keyevent KEYCODE_HOME; sleep 2
 adb shell am start -a android.settings.SETTINGS; sleep 3
 adb shell settings put system accelerometer_rotation 0
 adb shell settings put system user_rotation 1

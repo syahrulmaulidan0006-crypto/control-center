@@ -31,6 +31,11 @@ public class ShellService extends IShell.Stub {
         }
     }
 
+    @Override public int hotspot(boolean on, String ssid, String password) {
+        return on ? exec("cmd", "wifi", "start-softap", ssid, "wpa2", password)
+                : exec("cmd", "wifi", "stop-softap");
+    }
+
     @Override public int connectWifi(String ssid, String security, String password) {
         if ("open".equals(security)) {
             return exec("cmd", "wifi", "connect-network", ssid, "open");

@@ -34,6 +34,7 @@ public class OverlayService extends AccessibilityService {
     private static OverlayService instance;
     private View handle, leftHandle;
     private Sheet panel;
+    private Deck deck;
     private Banner banner;
     private WindowManager.LayoutParams bannerParams;
     private WindowManager.LayoutParams panelParams;
@@ -50,6 +51,13 @@ public class OverlayService extends AccessibilityService {
             removePanel();
             removeHandles();
             showHandles();
+        }
+    };
+
+    /** Memeriksa jadwal tidur tiap menit dan saat layar menyala. */
+    private final BroadcastReceiver ticker = new BroadcastReceiver() {
+        @Override public void onReceive(Context c, Intent i) {
+            Focus.check(OverlayService.this, controls);
         }
     };
 
@@ -70,6 +78,14 @@ public class OverlayService extends AccessibilityService {
         } else {
             registerReceiver(refresh, new IntentFilter(REFRESH));
         }
+        IntentFilter time = new IntentFilter(Intent.ACTION_TIME_TICK);
+        time.addAction(Intent.ACTION_SCREEN_ON);
+        if (Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(ticker, time, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(ticker, time);
+        }
+        Focus.check(this, controls);
         android.service.notification.NotificationListenerService.requestRebind(
                 new android.content.ComponentName(this, MusicListener.class));
     }
@@ -99,7 +115,10 @@ public class OverlayService extends AccessibilityService {
     }
 
     @Override public void onDestroy() {
-        if (instance != null) unregisterReceiver(refresh);
+        if (instance != null) {
+            unregisterReceiver(refresh);
+            unregisterReceiver(ticker);
+        }
         instance = null;
         removePanel();
         if (banner != null) removeBanner(banner);
@@ -217,7 +236,7 @@ public class OverlayService extends AccessibilityService {
 
     private void addPanel(boolean notifications) {
         removePanel();
-        if (banner != null) removeBanner(banner);
+        if (banner != null) banner.leave();
         panel = notifications ? new Center(this, controls) : new Panel(this, controls);
         android.util.Log.i("ControlCenter", "panel dibuka, pusat=" + notifications);
         panel.setBackground(new ColorDrawable(BACKGROUND));
@@ -228,8 +247,10 @@ public class OverlayService extends AccessibilityService {
             panelParams.setBlurBehindRadius(1);
         }
         blur = 1;
+        deck = new Deck(this, panel);
         panel.setProgress(0);
-        wm.addView(panel, panelParams);
+        deck.fade(0);
+        wm.addView(deck, panelParams);
     }
 
     /** Menutup panel notifikasi bawaan yang ikut terbuka (Android 12+). */
@@ -249,7 +270,7 @@ public class OverlayService extends AccessibilityService {
         if (has == !enabled) return;
         panelParams.flags ^= flag;
         panelParams.softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN;
-        wm.updateViewLayout(panel, panelParams);
+        wm.updateViewLayout(deck, panelParams);
     }
 
     /** Tampilkan popup notifikasi bila keadaan layar memungkinkan. */
@@ -274,7 +295,8 @@ public class OverlayService extends AccessibilityService {
             if ((bannerParams.flags & WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE) == 0) {
                 return skip("sedang mengetik balasan");
             }
-            removeBanner(banner);
+            // Popup lama keluar dengan animasi selagi yang baru masuk.
+            banner.leave();
         }
         Banner next = new Banner(this, note);
         bannerParams = params(Math.min(getResources().getDisplayMetrics().widthPixels, dp(440)),
@@ -311,22 +333,44 @@ public class OverlayService extends AccessibilityService {
     }
 
     void removeBanner(Banner target) {
-        if (banner != target) return;
-        wm.removeView(banner);
-        banner = null;
+        if (target.isAttachedToWindow()) wm.removeView(target);
+        if (banner == target) banner = null;
     }
 
     void drag(float progress) {
         if (panel == null) return;
         panel.setProgress(progress);
+        deck.fade(Math.max(0, Math.min(1, progress)));
         if (Build.VERSION.SDK_INT >= 31) {
             int target = Math.max(1, Math.round(dp(40) * Math.max(0, Math.min(1, progress))));
             if (Math.abs(target - blur) >= dp(3) || progress >= 1 || progress <= 0) {
                 blur = target;
                 panelParams.setBlurBehindRadius(blur);
-                wm.updateViewLayout(panel, panelParams);
+                wm.updateViewLayout(deck, panelParams);
             }
         }
+    }
+
+    /** Mulai berpindah dari satu halaman ke halaman sebelahnya. */
+    boolean startPage(Sheet from) {
+        if (panel != from || closing || deck.paging()) return false;
+        stopAnimation();
+        drag(1);
+        Sheet other = from instanceof Center ? new Panel(this, controls)
+                : new Center(this, controls);
+        other.setBackground(new ColorDrawable(BACKGROUND));
+        deck.begin(other);
+        return true;
+    }
+
+    void page(float dx) { if (deck != null) deck.drag(dx); }
+
+    void endPage(float velocity, boolean lifted) {
+        if (deck == null) return;
+        deck.release(velocity, lifted, chosen -> {
+            setKeyboard(false);
+            panel = chosen;
+        });
     }
 
     void stopAnimation() {
@@ -369,7 +413,8 @@ public class OverlayService extends AccessibilityService {
         stopAnimation();
         closing = false;
         if (panel == null) return;
-        wm.removeView(panel);
+        wm.removeView(deck);
+        deck = null;
         panel = null;
     }
 }

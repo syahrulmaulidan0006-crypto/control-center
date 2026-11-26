@@ -180,6 +180,10 @@ class MusicCard extends LinearLayout {
             title.setText(heading);
             title.setAlpha(0);
             title.animate().alpha(1).setDuration(320).start();
+            art.setAlpha(0);
+            art.setScaleX(0.8f);
+            art.setScaleY(0.8f);
+            art.animate().alpha(1).scaleX(1).scaleY(1).setDuration(380).start();
         }
         artist.setText(by);
         artist.setVisibility(by == null || by.length() == 0 ? GONE : VISIBLE);

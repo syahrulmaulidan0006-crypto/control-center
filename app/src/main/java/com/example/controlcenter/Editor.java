@@ -25,6 +25,7 @@ class Editor extends FrameLayout {
     private final GridLayout used, spare;
     private final int columns, cell;
     private final TextView spareTitle;
+    private Item fresh;
 
     Editor(Context context, int width, int columns, Runnable done) {
         super(context);
@@ -114,6 +115,10 @@ class Editor extends FrameLayout {
         holder.setContentDescription("Singkirkan " + item.label);
         holder.addView(content, new LayoutParams(cell, cell));
         holder.setOnTouchListener(new Drag(item));
+        if (item == fresh) {
+            fresh = null;
+            Motion.enter(holder, 0, dp(40));
+        }
         GridLayout.LayoutParams p = new GridLayout.LayoutParams();
         p.width = cell;
         p.height = cell;
@@ -149,6 +154,7 @@ class Editor extends FrameLayout {
         cover.setOnClickListener(v -> box.animate().scaleX(0.3f).scaleY(0.3f).alpha(0)
                 .setDuration(180).withEndAction(() -> {
                     if (!order.contains(item)) order.add(item);
+                    fresh = item;
                     changed();
                 }).start());
         GridLayout.LayoutParams p = new GridLayout.LayoutParams();
@@ -261,6 +267,7 @@ class Editor extends FrameLayout {
         t.setPadding(dp(18), dp(10), dp(18), dp(10));
         t.setBackground(new Glass(getContext(), 22, 0x33FFFFFF));
         t.setOnClickListener(v -> click.run());
+        Motion.press(t);
         return t;
     }
 

@@ -31,8 +31,10 @@ class Banner extends FrameLayout {
 
     void enter() {
         card.setTranslationY(-dp(160));
-        card.setScaleX(0.9f);
-        card.animate().translationY(0).scaleX(1).setDuration(420)
+        card.setScaleX(0.82f);
+        card.setScaleY(0.82f);
+        card.setAlpha(0);
+        card.animate().translationY(0).scaleX(1).scaleY(1).alpha(1).setDuration(460)
                 .setInterpolator(new android.view.animation.OvershootInterpolator(0.9f)).start();
         postDelayed(timeout, 6500);
     }
@@ -41,10 +43,12 @@ class Banner extends FrameLayout {
         if (leaving) return;
         leaving = true;
         removeCallbacks(timeout);
-        card.animate().translationY(-dp(220)).alpha(0).setDuration(220).start();
+        card.animate().translationY(-dp(190)).scaleX(0.82f).scaleY(0.82f).alpha(0)
+                .setStartDelay(0).setDuration(340)
+                .setInterpolator(new android.view.animation.AccelerateInterpolator(1.5f)).start();
         // Dihapus dengan penjadwalan sendiri, tidak bergantung pada akhir animasi.
         new android.os.Handler(android.os.Looper.getMainLooper())
-                .postDelayed(() -> service.removeBanner(this), 260);
+                .postDelayed(() -> service.removeBanner(this), 370);
     }
 
     /** Jangan tutup otomatis selagi disentuh atau sedang mengetik. */
@@ -59,7 +63,11 @@ class Banner extends FrameLayout {
     }
 
     /** Tarik ke bawah untuk membaca pesan lengkap. */
-    private void expand() { card.body.setMaxLines(8); }
+    private void expand() {
+        card.body.setMaxLines(8);
+        card.body.setAlpha(0.2f);
+        card.body.animate().alpha(1).setDuration(300).start();
+    }
 
     private int dp(int v) { return Math.round(v * getResources().getDisplayMetrics().density); }
 }

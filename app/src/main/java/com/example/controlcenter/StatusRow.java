@@ -26,6 +26,7 @@ class StatusRow extends View {
     private String carrier = "", network = "";
     private int signal, wifi = -1, battery;
     private boolean charging, airplane, locked, located;
+    private float fill;
 
     private final Runnable poll = new Runnable() {
         @Override public void run() {
@@ -145,6 +146,10 @@ class StatusRow extends View {
         }
         if (!network.isEmpty()) c.drawText(network, x, baseline, paint);
 
+        // Isi baterai bergerak halus menuju nilai sebenarnya.
+        fill += (battery - fill) * 0.12f;
+        if (Math.abs(battery - fill) > 0.5f) postInvalidateOnAnimation();
+        else fill = battery;
         // Kanan: lokasi, kunci rotasi, persentase, dan baterai berbentuk pil.
         float right = getWidth() - 2 * d;
         paint.setColor(0x80FFFFFF);
@@ -155,7 +160,7 @@ class StatusRow extends View {
         int color = charging ? 0xFF37D98A : battery <= 20 ? 0xFFFF5C5C : 0xFFFFFFFF;
         paint.setColor(color);
         c.save();
-        c.clipRect(body.left, body.top, body.left + body.width() * battery / 100f, body.bottom);
+        c.clipRect(body.left, body.top, body.left + body.width() * fill / 100f, body.bottom);
         c.drawRoundRect(body, 4.5f * d, 4.5f * d, paint);
         c.restore();
         if (charging) {
