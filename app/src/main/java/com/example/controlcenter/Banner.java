@@ -17,7 +17,7 @@ class Banner extends FrameLayout {
         this.service = service;
         this.note = note;
         setPadding(dp(10), dp(6), dp(10), dp(10));
-        card = new NoteCard(service, note, 0xDB1B2442);
+        card = new NoteCard(service, note, 0x990E1430);
         card.setOnClickListener(v -> { Notes.open(service, note); leave(); });
         card.gestures(this::leave, this::expand, this::leave);
         addView(card, new LayoutParams(-1, -2));
@@ -27,6 +27,16 @@ class Banner extends FrameLayout {
             postDelayed(timeout, 60000);
             service.bannerKeyboard(this);
         }, this::leave);
+        shade(card);
+    }
+
+    private void shade(android.view.View v) {
+        if (v instanceof android.widget.TextView) {
+            ((android.widget.TextView) v).setShadowLayer(dp(3), 0, dp(1), 0xB3000000);
+        } else if (v instanceof android.view.ViewGroup) {
+            android.view.ViewGroup group = (android.view.ViewGroup) v;
+            for (int i = 0; i < group.getChildCount(); i++) shade(group.getChildAt(i));
+        }
     }
 
     void enter() {

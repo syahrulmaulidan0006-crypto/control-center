@@ -32,6 +32,9 @@ abstract class Sheet extends FrameLayout {
 
     abstract void move(float value, float shown);
 
+    /** Saat berpindah halaman. offset: 0 = di tengah, -1 = di luar kiri, 1 = di luar kanan. */
+    abstract void parallax(float offset);
+
     /** Tombol kembali. Mengembalikan true bila lapisan di dalam yang ditutup. */
     boolean back() { return false; }
 

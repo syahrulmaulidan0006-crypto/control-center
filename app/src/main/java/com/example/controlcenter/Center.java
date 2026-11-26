@@ -23,7 +23,9 @@ class Center extends Sheet {
     private final Controls controls;
     private final LinearLayout box, list;
     private final Set<String> open = new HashSet<>();
-    private TileView torch;
+    private TileView torch, camera;
+    /** Isi awal muncul mengikuti jari; hanya yang datang kemudian yang dianimasikan sendiri. */
+    private boolean opened;
     /** Notifikasi yang sudah tampil, agar hanya yang baru yang dianimasikan. */
     private final Set<String> shown = new HashSet<>();
     private int arriving;
@@ -64,7 +66,13 @@ class Center extends Sheet {
         box.addView(list, land ? new LinearLayout.LayoutParams(0, -2, 3)
                 : new LinearLayout.LayoutParams(-1, -2));
 
+        // Bagian yang sedang meluncur masuk tidak boleh terpotong tepi wadahnya.
+        box.setClipChildren(false);
+        clocks.setClipChildren(false);
+        list.setClipChildren(false);
         FrameLayout wrap = new FrameLayout(service);
+        wrap.setClipChildren(false);
+        wrap.setClipToPadding(false);
         wrap.setPadding(0, dp(land ? 20 : 48), 0, dp(land ? 30 : 120));
         wrap.addView(box, new FrameLayout.LayoutParams(width, -2, Gravity.CENTER_HORIZONTAL));
         wrap.setOnClickListener(v -> service.closePanel());
@@ -78,10 +86,11 @@ class Center extends Sheet {
         torch.setOnClickListener(v -> controls.click(Item.TORCH));
         torch.setOn(controls.isOn(Item.TORCH), false);
         addView(torch, corner(Gravity.START));
-        TileView camera = new TileView(service, Item.CAMERA);
+        camera = new TileView(service, Item.CAMERA);
         camera.setOnClickListener(v -> controls.click(Item.CAMERA));
         addView(camera, corner(Gravity.END));
         build();
+        opened = true;
     }
 
     private LayoutParams corner(int side) {
@@ -107,7 +116,12 @@ class Center extends Sheet {
     }
 
     private boolean replying;
-    private final Runnable rebuild = () -> { if (!replying) build(); };
+    private final Runnable rebuild = () -> {
+        if (replying) return;
+        build();
+        // Kartu yang dibuat ulang saat panel masih bergerak mengikuti posisi sekarang.
+        if (progress() < 1) setProgress(progress());
+    };
 
     private void build() {
         list.removeAllViews();
@@ -186,7 +200,7 @@ class Center extends Sheet {
         LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2);
         p.topMargin = dp(10);
         list.addView(item, p);
-        if (shown.add(n.getKey())) Motion.enter(item, arriving++ * 55L, -dp(22));
+        if (shown.add(n.getKey()) && opened) Motion.enter(item, arriving++ * 55L, -dp(22));
     }
 
     private void section(String name, List<StatusBarNotification> clear) {
@@ -265,10 +279,45 @@ class Center extends Sheet {
 
     @Override int pageDirection() { return -1; }
 
+    /** Jam, tiap kartu, dan tombol sudut muncul berurutan mengikuti jari. */
     @Override void move(float value, float shown) {
-        box.setTranslationY(-(1 - value) * dp(260));
-        float scale = 0.94f + 0.06f * shown;
-        box.setScaleX(scale);
-        box.setScaleY(scale);
+        int order = 0;
+        for (int i = 0; i < box.getChildCount(); i++) {
+            View part = box.getChildAt(i);
+            if (part != list) reveal(part, value, shown, order++);
+        }
+        for (int i = 0; i < list.getChildCount(); i++) {
+            reveal(list.getChildAt(i), value, shown, order++);
+        }
+        for (View corner : new View[]{torch, camera}) {
+            if (corner == null) continue;
+            corner.setTranslationY((1 - value) * dp(150));
+            corner.setScaleX(0.5f + 0.5f * shown);
+            corner.setScaleY(0.5f + 0.5f * shown);
+        }
+    }
+
+    private void reveal(View v, float value, float shown, int order) {
+        float wait = Math.min(order, 7) * 0.07f;
+        float f = Math.max(0, (shown - wait) / (1 - wait));
+        // value melewati 1 sebentar di akhir sehingga terasa memantul.
+        float bounce = Math.max(0, value - 1) * dp(90);
+        v.setTranslationY(-(1 - f) * dp(70 + Math.min(order, 7) * 22) + bounce);
+        v.setScaleX(0.86f + 0.14f * f);
+        v.setScaleY(0.86f + 0.14f * f);
+        v.setAlpha(f);
+    }
+
+    @Override void parallax(float offset) {
+        int order = 0;
+        for (int i = 0; i < box.getChildCount(); i++) {
+            View part = box.getChildAt(i);
+            if (part != list) part.setTranslationX(offset * dp(24 + 26 * order++));
+        }
+        for (int i = 0; i < list.getChildCount(); i++) {
+            list.getChildAt(i).setTranslationX(offset * dp(24 + 26 * Math.min(order++, 7)));
+        }
+        torch.setTranslationX(offset * dp(60));
+        camera.setTranslationX(offset * dp(140));
     }
 }

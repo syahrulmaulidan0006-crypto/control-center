@@ -93,7 +93,8 @@ class Deck extends FrameLayout {
     }
 
     /** away: 0 = di tengah layar, 1 = sudah keluar. */
-    private void page(View v, float x, float away) {
+    private void page(Sheet v, float x, float away) {
+        v.parallax(Math.signum(x) * away);
         v.setTranslationX(x);
         v.setAlpha(1 - 0.55f * away);
         v.setScaleX(1 - 0.08f * away);
