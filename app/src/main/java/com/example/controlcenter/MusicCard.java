@@ -77,7 +77,10 @@ class MusicCard extends LinearLayout {
                 catch (Exception ignored) { }
             }
         });
-        int artSize = Math.min(dp(48), side * 28 / 100);
+        // 66 dp, diperkecil bila kotaknya sempit atau huruf sistem diperbesar,
+        // supaya judul, artis, dan tombol tetap muat.
+        int words = Math.round(40 * getResources().getDisplayMetrics().scaledDensity);
+        int artSize = Math.max(dp(36), Math.min(dp(66), side - dp(62) - words));
         top.addView(art, new LayoutParams(artSize, artSize));
         top.addView(new View(context), new LayoutParams(0, 1, 1));
         ImageView out = new ImageView(context);
