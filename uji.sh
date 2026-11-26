@@ -20,6 +20,9 @@ sleep 2; shot popup1
 sleep 8
 adb shell cmd notification post -t Rina pesan1 'Pesan_kedua'
 sleep 2; shot popup2
+echo "--- audio"
+adb shell dumpsys audio | grep -iE "ASSISTANCE_SONIFICATION|muted|PlaybackActivity|player piid" | tail -25
+adb shell dumpsys notification | grep -iE "suppress|hints" | head -10
 sleep 8
 W=$(adb shell wm size | grep -o '[0-9]*x' | tr -d x)
 buka() {
@@ -38,6 +41,8 @@ adb shell input draganddrop 173 460 650 460 900; sleep 2; shot geser
 adb shell input tap 173 700; sleep 2; shot hapus
 tutup; shot panel3
 tutup
+adb shell cmd notification post -t Budi pesan2 'Halo_satu'; sleep 3
+adb shell cmd notification post -t Sari pesan3 'Halo_dua'; sleep 8
 buka 15 80; shot pusat; tutup
 adb shell input keyevent KEYCODE_HOME; sleep 2
 adb shell am start -a android.settings.SETTINGS; sleep 3

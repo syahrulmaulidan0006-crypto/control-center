@@ -134,26 +134,20 @@ class Center extends Sheet {
         for (Map.Entry<String, List<StatusBarNotification>> g : map.entrySet()) {
             List<StatusBarNotification> items = g.getValue();
             String key = g.getKey();
-            if (items.size() == 1) { card(items.get(0), null); continue; }
+            if (items.size() == 1) { card(items.get(0), null, 0); continue; }
             if (open.contains(key)) {
                 pill(list, "Ringkas " + Notes.app(getContext(), key), () -> {
                     open.remove(key);
                     build();
                 });
-                for (StatusBarNotification n : items) card(n, null);
+                for (StatusBarNotification n : items) card(n, null, 0);
             } else {
-                card(items.get(0), () -> { open.add(key); build(); });
-                layer(16, 0x33FFFFFF);
-                layer(32, 0x1CFFFFFF);
-                TextView more = text((items.size() - 1) + " lainnya", 12, 0xCCFFFFFF);
-                more.setGravity(Gravity.CENTER);
-                more.setPadding(0, dp(4), 0, 0);
-                list.addView(more);
+                card(items.get(0), () -> { open.add(key); build(); }, items.size() - 1);
             }
         }
     }
 
-    private void card(StatusBarNotification n, Runnable stack) {
+    private void card(StatusBarNotification n, Runnable stack, int hidden) {
         NoteCard c = new NoteCard(getContext(), n, 0x2AFFFFFF);
         c.setOnClickListener(v -> {
             if (stack != null) { stack.run(); return; }
@@ -174,17 +168,14 @@ class Center extends Sheet {
             service.setKeyboard(false);
             postDelayed(rebuild, 300);
         });
+        View item = c;
+        if (hidden > 0) {
+            c.more("+" + hidden + " notifikasi lagi");
+            item = new Stack(getContext(), c, hidden);
+        }
         LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2);
         p.topMargin = dp(10);
-        list.addView(c, p);
-    }
-
-    private void layer(int inset, int color) {
-        View v = new View(getContext());
-        v.setBackground(new Glass(getContext(), 8, color));
-        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, dp(8));
-        p.setMargins(dp(inset), dp(1), dp(inset), 0);
-        list.addView(v, p);
+        list.addView(item, p);
     }
 
     private void section(String name, List<StatusBarNotification> clear) {
