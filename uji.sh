@@ -40,14 +40,14 @@ adb shell input tap 99 150; sleep 2; shot aturukuran
 adb shell input tap 190 560; sleep 1.5; shot aturketuk
 tutup; tutup
 adb shell settings put system accelerometer_rotation 0; adb shell settings put system user_rotation 1; sleep 4
-adb shell input swipe 1900 5 1900 700 300; sleep 2; shot mendatar; tutup
+adb shell am start -n $P/.MainActivity; sleep 4; shot mendataratur; adb shell input swipe 1900 5 1900 700 300; sleep 2; shot mendatar; tutup
 adb shell settings put system user_rotation 0; sleep 4
 adb shell am start -n $P/.MainActivity; sleep 4; shot beranda
 adb shell input tap 400 2027; sleep 2; shot tampilan
 adb shell input swipe 540 1700 540 500 500; sleep 1; shot tampilan2
 adb shell input swipe 540 1700 540 400 500; sleep 1; shot tampilan3
 adb shell input tap 660 2027; sleep 2; shot notif
-adb shell input tap 950 610; sleep 1; shot sakelar
+adb shell input tap 915 727; sleep 1; shot sakelar
 adb shell input tap 910 2027; sleep 2; shot lanjut
 echo "=== LOG ==="
 adb logcat -d | grep -E "ControlCenter|AndroidRuntime|FATAL" | tail -80
