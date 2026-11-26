@@ -66,7 +66,12 @@ class Center extends Sheet {
         box.addView(list, land ? new LinearLayout.LayoutParams(0, -2, 3)
                 : new LinearLayout.LayoutParams(-1, -2));
 
+        // Bagian yang sedang meluncur masuk tidak boleh terpotong tepi wadahnya.
+        box.setClipChildren(false);
+        clocks.setClipChildren(false);
+        list.setClipChildren(false);
         FrameLayout wrap = new FrameLayout(service);
+        wrap.setClipChildren(false);
         wrap.setPadding(0, dp(land ? 20 : 48), 0, dp(land ? 30 : 120));
         wrap.addView(box, new FrameLayout.LayoutParams(width, -2, Gravity.CENTER_HORIZONTAL));
         wrap.setOnClickListener(v -> service.closePanel());
