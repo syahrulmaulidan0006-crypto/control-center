@@ -399,7 +399,8 @@ public class MainActivity extends Activity {
         s.setChecked(Prefs.is(this, key, fallback));
         s.setOnCheckedChangeListener((v, on) -> {
             Prefs.of(this).edit().putBoolean(key, on).commit();
-            if (key.equals("leftSwipe") || key.equals("noSwipeLand") || key.equals("sound") || key.equals("muteNative")) {
+            if (key.equals("leftSwipe") || key.equals("noSwipeLand") || key.equals("sound") || key.equals("muteNative")
+                    || key.equals("vibrate")) {
                 sendBroadcast(new Intent(OverlayService.REFRESH).setPackage(getPackageName()));
             }
         });
