@@ -36,6 +36,7 @@ class Panel extends Sheet {
     private VerticalSlider light, sound;
     private FrameLayout expanded, popup;
     private boolean collapsing;
+    private View source;
 
     private final Runnable poll = new Runnable() {
         @Override public void run() {
@@ -86,6 +87,7 @@ class Panel extends Sheet {
         add.setPadding(dp(6), dp(6), dp(6), dp(6));
         add.setBackground(new Glass(service, 16, 0x26FFFFFF));
         add.setOnClickListener(v -> edit());
+        Motion.press(add);
         LinearLayout.LayoutParams addSize = new LinearLayout.LayoutParams(
                 dp(land ? 24 : 30), dp(land ? 24 : 30));
         addSize.rightMargin = dp(10);
@@ -96,6 +98,7 @@ class Panel extends Sheet {
         page.addView(box, new LinearLayout.LayoutParams(-1, -2));
         wrap.addView(page, new LayoutParams(width, -2, Gravity.CENTER));
         wrap.setOnClickListener(v -> service.closePanel());
+        wrap.setOnLongClickListener(v -> { edit(); return true; });
         scroll = new ScrollView(service);
         scroll.setFillViewport(true);
         scroll.setVerticalScrollBarEnabled(false);
@@ -151,7 +154,10 @@ class Panel extends Sheet {
     }
 
     private void refresh(boolean animate) {
-        for (TileView t : tiles) t.setOn(controls.isOn(t.item), animate);
+        for (TileView t : tiles) {
+            t.setOn(controls.isOn(t.item), animate);
+            if (t.item == Item.DND) t.face(Focus.icon(getContext()));
+        }
         for (int i = 0; i < states.size(); i++) {
             Item item = stateItems.get(i);
             states.get(i).setText(item == Item.HOTSPOT ? "Pengaturan"
@@ -169,20 +175,12 @@ class Panel extends Sheet {
             else controls.click(item);
             postDelayed(() -> refresh(true), 150);
         });
-        if (item.movable() && expanded == null) {
-            t.setOnLongClickListener(v -> {
-                v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
-                edit();
-                return true;
-            });
-        }
-        if (item == Item.WIFI || item == Item.DATA || item == Item.BLUETOOTH) {
-            t.setOnLongClickListener(v -> {
-                v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
-                showPicker(item);
-                return true;
-            });
-        }
+        // Tekan lama membuka jendela mengambang milik tombol itu.
+        t.setOnLongClickListener(v -> {
+            v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+            showPicker(item, v);
+            return true;
+        });
         tiles.add(t);
         return t;
     }
@@ -272,6 +270,7 @@ class Panel extends Sheet {
                     Math.max(1, Math.round(value * 255)));
         }, controls::canWrite);
         light.setContentDescription("Kecerahan");
+        light.onHold = () -> showPicker(Item.AUTO_LIGHT, light);
         sliders.addView(light, new LinearLayout.LayoutParams(unit, -1));
 
         AudioManager audio = controls.audio;
@@ -283,6 +282,7 @@ class Panel extends Sheet {
             } catch (SecurityException e) { controls.toast("Izin Jangan Ganggu diperlukan"); }
         }, null);
         sound.setContentDescription("Volume");
+        sound.onHold = () -> showPicker(Item.VOLUME, sound);
         sound.levelIcons(R.drawable.ic_volume0, R.drawable.ic_volume1);
         LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(unit, -1);
         p.leftMargin = gap;
@@ -331,6 +331,7 @@ class Panel extends Sheet {
         if (editor != null || popup != null || expanded != null) return;
         editor = new Editor(getContext(), width, land ? 8 : 4, this::closeEditor);
         addView(editor, new LayoutParams(-1, -1));
+        service.dots(false);
         blur(scroll, true);
         scroll.animate().alpha(0).setDuration(220).start();
         editor.setAlpha(0);
@@ -344,9 +345,13 @@ class Panel extends Sheet {
         Editor old = editor;
         if (old == null) return;
         editor = null;
+        service.dots(true);
         fill();
         blur(scroll, false);
         scroll.animate().alpha(1).setDuration(220).start();
+        for (int i = 0; i < custom.size(); i++) {
+            Motion.enter(custom.get(i), i * 18L, dp(18));
+        }
         old.animate().alpha(0).setDuration(180).withEndAction(() -> removeView(old)).start();
     }
 
@@ -425,7 +430,7 @@ class Panel extends Sheet {
                 new android.view.ViewTreeObserver.OnPreDrawListener() {
             @Override public boolean onPreDraw() {
                 card.getViewTreeObserver().removeOnPreDrawListener(this);
-                morph(card, true, null);
+                morph(card, connections, true, null);
                 return true;
             }
         });
@@ -433,15 +438,16 @@ class Panel extends Sheet {
         scroll.animate().alpha(0.25f).setDuration(260).start();
     }
 
-    private void morph(View card, boolean open, Runnable end) {
+    /** Membesar dari tombol atau kotak asalnya, dan kembali ke sana saat ditutup. */
+    private void morph(View card, View origin, boolean open, Runnable end) {
         int[] from = new int[2], to = new int[2];
-        connections.getLocationInWindow(from);
+        origin.getLocationInWindow(from);
         ((View) card.getParent()).getLocationInWindow(to);
-        float sx = connections.getWidth() / (float) card.getWidth();
-        float sy = connections.getHeight() / (float) card.getHeight();
-        float tx = from[0] + connections.getWidth() / 2f
+        float sx = origin.getWidth() / (float) card.getWidth();
+        float sy = origin.getHeight() / (float) card.getHeight();
+        float tx = from[0] + origin.getWidth() / 2f
                 - (to[0] + card.getLeft() + card.getWidth() / 2f);
-        float ty = from[1] + connections.getHeight() / 2f
+        float ty = from[1] + origin.getHeight() / 2f
                 - (to[1] + card.getTop() + card.getHeight() / 2f);
         if (open) {
             card.setScaleX(sx);
@@ -463,7 +469,7 @@ class Panel extends Sheet {
         collapsing = true;
         blur(scroll, false);
         scroll.animate().alpha(1).setDuration(240).start();
-        morph(layer.getChildAt(0), false, () -> {
+        morph(layer.getChildAt(0), connections, false, () -> {
             removeView(layer);
             expanded = null;
             collapsing = false;
@@ -476,21 +482,26 @@ class Panel extends Sheet {
 
     // ---------------------------------------------------------------- Jendela mengambang
 
-    private void showPicker(Item item) {
-        if (popup != null) return;
+    private void showPicker(Item item, View origin) {
+        if (popup != null || editor != null) return;
+        source = origin;
         popup = new Picker(getContext(), controls, item, Math.min(width, dp(400)),
                 this::closePicker);
         addView(popup, new LayoutParams(-1, -1));
         View behind = expanded != null ? expanded : scroll;
         blur(behind, true);
-        behind.animate().alpha(0.2f).setDuration(200).start();
+        behind.animate().alpha(0.2f).setDuration(240).start();
         popup.setAlpha(0);
         popup.animate().alpha(1).setDuration(180).start();
-        View card = popup.getChildAt(0);
-        card.setScaleX(0.8f);
-        card.setScaleY(0.8f);
-        card.animate().scaleX(1).scaleY(1).setDuration(320)
-                .setInterpolator(new android.view.animation.OvershootInterpolator(1.2f)).start();
+        View card = ((FrameLayout) popup).getChildAt(0);
+        card.getViewTreeObserver().addOnPreDrawListener(
+                new android.view.ViewTreeObserver.OnPreDrawListener() {
+            @Override public boolean onPreDraw() {
+                card.getViewTreeObserver().removeOnPreDrawListener(this);
+                morph(card, origin, true, null);
+                return true;
+            }
+        });
     }
 
     private void closePicker() {
@@ -500,12 +511,18 @@ class Panel extends Sheet {
         service.setKeyboard(false);
         if (expanded != null) {
             blur(expanded, false);
-            expanded.animate().alpha(1).setDuration(180).start();
+            expanded.animate().alpha(1).setDuration(220).start();
         } else {
             blur(scroll, false);
-            scroll.animate().alpha(1).setDuration(180).start();
+            scroll.animate().alpha(1).setDuration(220).start();
         }
-        old.animate().alpha(0).setDuration(160).withEndAction(() -> removeView(old)).start();
+        old.animate().alpha(0).setDuration(240).start();
+        if (source != null && source.isAttachedToWindow()) {
+            morph(old.getChildAt(0), source, false, () -> removeView(old));
+        } else {
+            postDelayed(() -> removeView(old), 250);
+        }
+        postDelayed(() -> refresh(true), 100);
     }
 
     /** Konten di belakang dibuat buram (Android 12+). */
@@ -518,6 +535,8 @@ class Panel extends Sheet {
     }
 
     // ---------------------------------------------------------------- Gerakan
+
+    @Override int pageDirection() { return 1; }
 
     @Override void move(float value, float shown) {
         float away = 1 - value;

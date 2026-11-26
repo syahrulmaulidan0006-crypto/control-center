@@ -26,6 +26,15 @@ class VerticalSlider extends View {
     private android.animation.ValueAnimator animator;
     private boolean active;
     private final int covered;
+    private float startY, startValue;
+    private boolean moved, held;
+    /** Dijalankan saat slider ditekan lama tanpa digeser. */
+    Runnable onHold;
+    private final Runnable hold = () -> {
+        held = true;
+        performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+        onHold.run();
+    };
 
     VerticalSlider(Context context, int iconRes, float start, Listener listener,
             BooleanSupplier allowed) {
@@ -87,20 +96,39 @@ class VerticalSlider extends View {
     }
 
     @Override public boolean onTouchEvent(MotionEvent e) {
-        if (e.getAction() == MotionEvent.ACTION_DOWN) {
+        int a = e.getActionMasked();
+        if (a == MotionEvent.ACTION_DOWN) {
             active = allowed == null || allowed.getAsBoolean();
             getParent().requestDisallowInterceptTouchEvent(true);
             touching = true;
+            moved = held = false;
+            startY = e.getY();
+            startValue = value;
             if (animator != null) animator.cancel();
+            if (onHold != null) postDelayed(hold, 450);
+            animate().scaleX(1.05f).scaleY(1.03f).setDuration(160).start();
+            return true;
         }
-        if (e.getAction() == MotionEvent.ACTION_UP
-                || e.getAction() == MotionEvent.ACTION_CANCEL) {
-            postDelayed(() -> touching = false, 250);
+        if (a == MotionEvent.ACTION_MOVE && !moved && Math.abs(e.getY() - startY)
+                > android.view.ViewConfiguration.get(getContext()).getScaledTouchSlop()) {
+            moved = true;
+            removeCallbacks(hold);
         }
-        if (active && e.getAction() != MotionEvent.ACTION_CANCEL) {
-            value = Math.max(0f, Math.min(1f, 1 - e.getY() / getHeight()));
+        boolean up = a == MotionEvent.ACTION_UP;
+        if (active && !held && (a == MotionEvent.ACTION_MOVE && moved || up)) {
+            // Digeser: mengikuti jarak jari. Diketuk: langsung ke titik sentuh.
+            float next = moved ? startValue + (startY - e.getY()) / getHeight()
+                    : 1 - e.getY() / getHeight();
+            value = Math.max(0f, Math.min(1f, next));
             listener.onChange(value);
             invalidate();
+        }
+        if (up || a == MotionEvent.ACTION_CANCEL) {
+            removeCallbacks(hold);
+            postDelayed(() -> touching = false, 250);
+            animate().scaleX(1).scaleY(1).setDuration(280)
+                    .setInterpolator(new android.view.animation.OvershootInterpolator(2.5f))
+                    .start();
         }
         return true;
     }

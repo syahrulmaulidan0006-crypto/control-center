@@ -21,6 +21,7 @@ import android.widget.TextView;
 class NoteCard extends LinearLayout {
     private float downX, downY;
     private boolean swiping;
+    boolean rightOnly;
     private VelocityTracker velocity;
     private Runnable dismiss, pullDown, swipeUp;
     final TextView body;
@@ -98,7 +99,9 @@ class NoteCard extends LinearLayout {
         if (reply != null) {
             button(buttons, "Balas", () -> {
                 buttons.setVisibility(GONE);
-                addView(replyRow(n, reply, done), indexOfChild(buttons) + 1, top);
+                LinearLayout field = replyRow(n, reply, done);
+                addView(field, indexOfChild(buttons) + 1, top);
+                Motion.enter(field, 0, dp(14));
                 onType.run();
                 View row = getChildAt(indexOfChild(buttons) + 1);
                 View input = ((LinearLayout) row).getChildAt(0);
@@ -149,6 +152,7 @@ class NoteCard extends LinearLayout {
             toast(ok ? "Terkirim" : "Gagal mengirim");
             if (ok) done.run();
         });
+        Motion.press(send);
         LayoutParams p = new LayoutParams(dp(48), dp(48));
         p.leftMargin = dp(8);
         row.addView(send, p);
@@ -160,6 +164,7 @@ class NoteCard extends LinearLayout {
         t.setGravity(Gravity.CENTER);
         t.setBackground(new Glass(getContext(), 22, 0x26FFFFFF));
         t.setOnClickListener(v -> click.run());
+        Motion.press(t);
         LayoutParams p = new LayoutParams(0, dp(42), 1);
         p.setMargins(dp(3), 0, dp(3), 0);
         row.addView(t, p);
@@ -186,6 +191,7 @@ class NoteCard extends LinearLayout {
         int a = e.getActionMasked();
         float dx = e.getRawX() - downX, dy = e.getRawY() - downY;
         if (a == MotionEvent.ACTION_MOVE && swiping) {
+            if (rightOnly) dx = Math.max(0, dx);
             setTranslationX(dx);
             setAlpha(1 - Math.min(0.8f, Math.abs(dx) / Math.max(1, getWidth())));
             return true;
@@ -193,7 +199,8 @@ class NoteCard extends LinearLayout {
         if (a == MotionEvent.ACTION_UP || a == MotionEvent.ACTION_CANCEL) {
             if (swiping) {
                 velocity.computeCurrentVelocity(1000);
-                boolean gone = a == MotionEvent.ACTION_UP && (Math.abs(dx) > getWidth() * 0.4f
+                if (rightOnly) dx = Math.max(0, dx);
+                boolean gone = a == MotionEvent.ACTION_UP && dx != 0 && (Math.abs(dx) > getWidth() * 0.4f
                         || Math.abs(velocity.getXVelocity()) > dp(900));
                 swiping = false;
                 if (gone && dismiss != null) {
@@ -216,6 +223,20 @@ class NoteCard extends LinearLayout {
         return super.onTouchEvent(e);
     }
 
+    /** Kartu sedikit mengecil selagi disentuh. */
+    private void touchFeel(int action) {
+        float scale = action == MotionEvent.ACTION_DOWN ? 0.975f : 1;
+        if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_UP
+                || action == MotionEvent.ACTION_CANCEL) {
+            animate().scaleX(scale).scaleY(scale).setStartDelay(0).setDuration(160).start();
+        }
+    }
+
+    @Override public boolean dispatchTouchEvent(MotionEvent e) {
+        touchFeel(e.getActionMasked());
+        return super.dispatchTouchEvent(e);
+    }
+
     private void track(MotionEvent e) {
         if (e.getActionMasked() == MotionEvent.ACTION_DOWN) {
             downX = e.getRawX();
@@ -231,6 +252,8 @@ class NoteCard extends LinearLayout {
         raw.recycle();
         if (!swiping && dismiss != null && e.getActionMasked() == MotionEvent.ACTION_MOVE) {
             float dx = Math.abs(e.getRawX() - downX), dy = Math.abs(e.getRawY() - downY);
+            // Di pusat notifikasi, geser ke kiri dipakai untuk pindah halaman.
+            if (rightOnly && e.getRawX() < downX) return;
             if (dx > ViewConfiguration.get(getContext()).getScaledTouchSlop() && dx > dy * 1.3f) {
                 swiping = true;
                 getParent().requestDisallowInterceptTouchEvent(true);

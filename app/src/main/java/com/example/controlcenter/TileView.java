@@ -64,6 +64,17 @@ class TileView extends View {
         }
     }
 
+    private int face;
+
+    /** Mengganti gambar ikon, misalnya sesuai mode fokus yang aktif. */
+    void face(int res) {
+        int now = face == 0 ? item.icon : face;
+        if (res == now) return;
+        face = res;
+        setIcon(res);
+        if (isAttachedToWindow()) act();
+    }
+
     /** Gerakan khas tiap ikon. */
     void act() {
         if (motion != null && motion.isRunning()) return;

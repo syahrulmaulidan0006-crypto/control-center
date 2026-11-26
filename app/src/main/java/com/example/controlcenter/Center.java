@@ -24,6 +24,9 @@ class Center extends Sheet {
     private final LinearLayout box, list;
     private final Set<String> open = new HashSet<>();
     private TileView torch;
+    /** Notifikasi yang sudah tampil, agar hanya yang baru yang dianimasikan. */
+    private final Set<String> shown = new HashSet<>();
+    private int arriving;
 
     private final Runnable poll = new Runnable() {
         @Override public void run() {
@@ -108,6 +111,7 @@ class Center extends Sheet {
 
     private void build() {
         list.removeAllViews();
+        arriving = 0;
         if (!MusicListener.connected()) {
             empty("Akses notifikasi belum tersambung.\nKetuk untuk membuka pengaturan.",
                     () -> controls.launch(new android.content.Intent(
@@ -138,11 +142,16 @@ class Center extends Sheet {
             if (open.contains(key)) {
                 pill(list, "Ringkas " + Notes.app(getContext(), key), () -> {
                     open.remove(key);
+                    for (StatusBarNotification n : items) shown.remove(n.getKey());
                     build();
                 });
                 for (StatusBarNotification n : items) card(n, null, 0);
             } else {
-                card(items.get(0), () -> { open.add(key); build(); }, items.size() - 1);
+                card(items.get(0), () -> {
+                    open.add(key);
+                    for (StatusBarNotification n : items) shown.remove(n.getKey());
+                    build();
+                }, items.size() - 1);
             }
         }
     }
@@ -155,9 +164,10 @@ class Center extends Sheet {
             service.closePanel();
         });
         if (n.isClearable()) {
+            c.rightOnly = true;
             c.gestures(() -> {
-                MusicListener.dismiss(n.getKey());
-                c.setVisibility(GONE);
+                View whole = c.getParent() == list ? c : (View) c.getParent();
+                Motion.collapse(whole, () -> MusicListener.dismiss(n.getKey()));
             }, null, null);
         }
         c.actions(n, () -> {
@@ -176,6 +186,7 @@ class Center extends Sheet {
         LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2);
         p.topMargin = dp(10);
         list.addView(item, p);
+        if (shown.add(n.getKey())) Motion.enter(item, arriving++ * 55L, -dp(22));
     }
 
     private void section(String name, List<StatusBarNotification> clear) {
@@ -187,9 +198,16 @@ class Center extends Sheet {
         row.addView(t, new LinearLayout.LayoutParams(0, -2, 1));
         if (clear != null) {
             pill(row, "Hapus semua", () -> {
-                for (StatusBarNotification n : clear) {
-                    if (n.isClearable()) MusicListener.dismiss(n.getKey());
+                // Kartu keluar berurutan, baru kemudian dihapus.
+                for (int i = 0; i < list.getChildCount(); i++) {
+                    list.getChildAt(i).animate().translationX(getWidth()).alpha(0)
+                            .setStartDelay(i * 45L).setDuration(260).start();
                 }
+                postDelayed(() -> {
+                    for (StatusBarNotification n : clear) {
+                        if (n.isClearable()) MusicListener.dismiss(n.getKey());
+                    }
+                }, list.getChildCount() * 45L + 270);
             });
         }
         list.addView(row, new LinearLayout.LayoutParams(-1, -2));
@@ -201,6 +219,7 @@ class Center extends Sheet {
         t.setPadding(dp(18), 0, dp(18), 0);
         t.setBackground(new Glass(getContext(), 22, 0x22FFFFFF));
         t.setOnClickListener(v -> click.run());
+        Motion.press(t);
         LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-2, dp(40));
         p.topMargin = parent == list ? dp(10) : 0;
         p.gravity = Gravity.END;
@@ -243,6 +262,8 @@ class Center extends Sheet {
         t.setTextColor(color);
         return t;
     }
+
+    @Override int pageDirection() { return -1; }
 
     @Override void move(float value, float shown) {
         box.setTranslationY(-(1 - value) * dp(260));

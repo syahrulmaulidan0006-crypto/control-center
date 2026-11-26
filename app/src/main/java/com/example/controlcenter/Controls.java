@@ -1,7 +1,6 @@
 package com.example.controlcenter;
 
 import android.accessibilityservice.AccessibilityService;
-import android.app.NotificationManager;
 import android.app.UiModeManager;
 import android.content.ComponentName;
 import android.content.ContentResolver;
@@ -73,7 +72,7 @@ class Controls {
                 case LOCATION:
                     return service.getSystemService(LocationManager.class).isLocationEnabled();
                 case ROTATION: return system(Settings.System.ACCELEROMETER_ROTATION, 1) == 0;
-                case DND: return dndOn();
+                case DND: return Focus.on(service);
                 case TORCH: return torchOn;
                 case VIBRATE: return audio.getRingerMode() != AudioManager.RINGER_MODE_NORMAL;
                 case DARK: return (service.getResources().getConfiguration().uiMode
@@ -120,7 +119,7 @@ class Controls {
             case AUTO_LIGHT:
                 if (canWrite()) put(Settings.System.SCREEN_BRIGHTNESS_MODE, isOn(item) ? 0 : 1);
                 break;
-            case DND: toggleDnd(); break;
+            case DND: Focus.toggle(service, this); break;
             case TORCH:
                 if (torchId == null) { toast("Senter tidak tersedia"); break; }
                 try { camera.setTorchMode(torchId, !torchOn); }
@@ -253,20 +252,23 @@ class Controls {
         Settings.System.putInt(service.getContentResolver(), key, value);
     }
 
-    private boolean dndOn() {
-        int f = service.getSystemService(NotificationManager.class).getCurrentInterruptionFilter();
-        return f != NotificationManager.INTERRUPTION_FILTER_ALL
-                && f != NotificationManager.INTERRUPTION_FILTER_UNKNOWN;
+    /** Jumlah tingkat terang senter; 1 berarti tidak bisa diatur. */
+    int torchLevels() {
+        if (android.os.Build.VERSION.SDK_INT < 33 || torchId == null) return 1;
+        try {
+            Integer max = camera.getCameraCharacteristics(torchId)
+                    .get(CameraCharacteristics.FLASH_INFO_STRENGTH_MAXIMUM_LEVEL);
+            return max == null ? 1 : max;
+        } catch (Exception e) { return 1; }
     }
 
-    private void toggleDnd() {
-        NotificationManager nm = service.getSystemService(NotificationManager.class);
-        if (!nm.isNotificationPolicyAccessGranted()) {
-            toast("Buka aplikasi dan berikan izin Jangan Ganggu");
-            return;
-        }
-        nm.setInterruptionFilter(dndOn() ? NotificationManager.INTERRUPTION_FILTER_ALL
-                : NotificationManager.INTERRUPTION_FILTER_PRIORITY);
+    void torchStrength(float value) {
+        if (android.os.Build.VERSION.SDK_INT < 33) return;
+        try {
+            int level = Math.round(value * torchLevels());
+            if (level < 1) camera.setTorchMode(torchId, false);
+            else camera.turnOnTorchWithStrengthLevel(torchId, level);
+        } catch (Exception e) { toast("Senter sedang tidak bisa diatur"); }
     }
 
     void toast(String s) { Toast.makeText(service, s, Toast.LENGTH_SHORT).show(); }
