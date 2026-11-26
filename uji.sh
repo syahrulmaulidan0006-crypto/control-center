@@ -72,9 +72,9 @@ adb shell input tap 100 150; sleep 2; shot atur5; tutup; tutup
 # --- versi 19
 adb shell input keyevent KEYCODE_HOME; sleep 2
 adb shell cmd notification post -t Dewi baru1 'Kabar_satu'; sleep 1; adb shell cmd notification post -t Eko baru2 'Kabar_dua'; sleep 10
-adb shell "input motionevent DOWN 162 5; input motionevent MOVE 162 120; input motionevent MOVE 162 300"; sleep 1; shot buka1
-adb shell input motionevent UP 162 300; sleep 2; shot buka2; tutup
-adb shell am start -a android.settings.SETTINGS; sleep 3
+buka 15 250; shot buka2
+adb shell input swipe 540 1850 540 1550 3000 & sleep 1.5; shot setengah; wait; sleep 2; tutup
+adb shell cmd statusbar collapse; adb shell am start -a android.settings.SETTINGS; sleep 3
 adb shell cmd notification post -t Fajar bening 'Popup_di_atas_layar_terang'; sleep 1.5; shot bening
 adb shell input keyevent KEYCODE_HOME; sleep 8
 # jadwal tidur: pindahkan jam emulator ke dalam lalu ke luar jadwal
