@@ -99,6 +99,12 @@ adb shell am broadcast -n $P/.TestMusic; sleep 3
 buka 85 250; shot musik
 adb shell input swipe 150 1750 850 1750 100; sleep 2; adb shell input swipe 850 1750 150 1750 100; sleep 2; shot musik2
 tutup
+# --- versi 19
+adb shell input keyevent KEYCODE_HOME; sleep 2
+adb shell cmd notification post -t Dewi baru1 'Kabar_satu'; sleep 1; adb shell cmd notification post -t Eko baru2 'Kabar_dua'; sleep 10
+adb shell input swipe 162 5 162 700 3500 & sleep 1.3; shot buka1; wait; sleep 2; shot buka2; tutup
+adb shell am start -a android.settings.SETTINGS; sleep 3
+adb shell cmd notification post -t Fajar bening 'Popup_di_atas_layar_terang'; sleep 1.5; shot bening
 echo "=== LOG ==="
 adb logcat -d | grep -E "ControlCenter|AndroidRuntime|FATAL|com.example" | grep -vE "ActivityManager: Start proc" | tail -80
 exit 0

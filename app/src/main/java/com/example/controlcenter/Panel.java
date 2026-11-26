@@ -553,6 +553,13 @@ class Panel extends Sheet {
         box.setScaleY(scale);
     }
 
+    @Override void parallax(float offset) {
+        // Bagian bawah tertinggal sedikit lebih jauh sehingga datang berurutan.
+        for (int i = 0; i < box.getChildCount(); i++) {
+            box.getChildAt(i).setTranslationX(offset * dp(24 + i * 36));
+        }
+    }
+
     @Override boolean back() {
         if (editor != null) { closeEditor(); return true; }
         if (popup != null) { closePicker(); return true; }
