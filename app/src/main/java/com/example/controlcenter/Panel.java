@@ -30,7 +30,7 @@ class Panel extends Sheet {
     private final int width, unit, gap;
     private final boolean land;
     private View connections;
-    private GridLayout middle, shortcuts;
+    private FrameLayout middle, shortcuts;
     private final List<TileView> custom = new ArrayList<>();
     private Editor editor;
     private VerticalSlider light, sound;
@@ -253,8 +253,9 @@ class Panel extends Sheet {
         LinearLayout row = new LinearLayout(getContext());
         row.setClipChildren(false);
         LinearLayout sliders = row;
-        middle = grid(2);
-        GridLayout grid = middle;
+        middle = new FrameLayout(getContext());
+        middle.setClipChildren(false);
+        FrameLayout grid = middle;
         if (land) {
             row.setOrientation(LinearLayout.VERTICAL);
             row.addView(grid, new LinearLayout.LayoutParams(-2, unit * 2 + gap));
@@ -300,35 +301,37 @@ class Panel extends Sheet {
     }
 
     private void buildShortcuts() {
-        shortcuts = grid(4);
+        shortcuts = new FrameLayout(getContext());
+        shortcuts.setClipChildren(false);
         addSection(shortcuts, land ? unit * 4 + gap * 4 : width + gap, -2);
     }
 
-    /** Empat tombol pertama berada di samping slider, sisanya di kisi bawah. */
+    /** Tombol mengisi ruang di samping slider lebih dahulu, sisanya di kisi bawah. */
     private void fill() {
         tiles.removeAll(custom);
         custom.clear();
         middle.removeAllViews();
         shortcuts.removeAllViews();
-        List<Item> order = Item.load(getContext());
-        for (int i = 0; i < Math.max(4, order.size()); i++) {
-            View v;
-            if (i < order.size()) {
-                TileView t = tile(order.get(i));
-                custom.add(t);
-                v = t;
-            } else {
-                v = new View(getContext());
+        Pack beside = new Pack(2, 2), below = new Pack(4, 0);
+        for (Item item : Item.load(getContext())) {
+            int size = Item.size(getContext(), item);
+            int w = Item.SPANS[size][0], h = Item.SPANS[size][1];
+            TileView t = tile(item);
+            t.large = size == 2;
+            custom.add(t);
+            FrameLayout target = middle;
+            int[] at = beside.place(w, h);
+            if (at == null) {
+                target = shortcuts;
+                at = below.place(w, h);
             }
-            if (i < 4) {
-                cell(middle, v, i < 2 ? gap : 0);
-                // Dalam mode mendatar kolom kanan tidak memakai jarak tambahan.
-                if (land && i % 2 == 1) {
-                    ((GridLayout.LayoutParams) v.getLayoutParams()).rightMargin = 0;
-                }
-            } else {
-                cell(shortcuts, v, gap);
-            }
+            LayoutParams p = new LayoutParams(w * unit + (w - 1) * gap,
+                    h * unit + (h - 1) * gap, Gravity.TOP | Gravity.LEFT);
+            p.leftMargin = at[0] * (unit + gap);
+            p.topMargin = at[1] * (unit + gap);
+            // Jarak di bawah baris terakhir kisi bawah.
+            if (target == shortcuts) p.bottomMargin = gap;
+            target.addView(t, p);
         }
         refresh(false);
     }
@@ -368,14 +371,6 @@ class Panel extends Sheet {
         g.setColumnCount(columns);
         g.setClipChildren(false);
         return g;
-    }
-
-    private void cell(GridLayout grid, View v, int bottom) {
-        GridLayout.LayoutParams p = new GridLayout.LayoutParams();
-        p.width = unit;
-        p.height = unit;
-        p.setMargins(0, 0, gap, bottom);
-        grid.addView(v, p);
     }
 
     // ---------------------------------------------------------------- Kotak membesar

@@ -305,6 +305,9 @@ class Picker extends FrameLayout {
             row(R.drawable.ic_hourglass, minutes + " menit", "Mulai hitung mundur", false,
                     () -> {
                         controls.toast("Timer " + minutes + " menit dimulai");
+                        // Dipakai kapsul melayang untuk menghitung mundur.
+                        Prefs.of(getContext()).edit().putLong(Island.TIMER_END,
+                                System.currentTimeMillis() + minutes * 60000L).apply();
                         controls.launch(new Intent(AlarmClock.ACTION_SET_TIMER)
                                 .putExtra(AlarmClock.EXTRA_LENGTH, minutes * 60)
                                 .putExtra(AlarmClock.EXTRA_SKIP_UI, true));

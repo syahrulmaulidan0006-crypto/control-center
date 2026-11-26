@@ -15,6 +15,25 @@ public class TestMusic extends BroadcastReceiver {
     private static MediaSession session;
 
     @Override public void onReceive(Context context, Intent intent) {
+        if (intent.hasExtra("timer")) {
+            context.getSharedPreferences("cc", Context.MODE_MULTI_PROCESS).edit()
+                    .putLong("timerEnd", System.currentTimeMillis()
+                            + intent.getIntExtra("timer", 0) * 1000L).commit();
+            return;
+        }
+        if (intent.hasExtra("ukuran")) {
+            java.util.List<Item> all = Item.load(context);
+            int[][] sizes = {{0, 1}, {3, 1}, {4, 2}, {7, 1}};
+            for (int[] one : sizes) {
+                Item.resize(context, all.get(one[0]), intent.getIntExtra("ukuran", 0) * one[1]);
+            }
+            return;
+        }
+        if (intent.hasExtra("henti")) {
+            if (session != null) session.release();
+            session = null;
+            return;
+        }
         if (intent.hasExtra("bening")) {
             context.getSharedPreferences("cc", Context.MODE_MULTI_PROCESS).edit()
                     .putInt("popupClear", intent.getIntExtra("bening", 50)).commit();

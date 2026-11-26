@@ -193,6 +193,25 @@ public class MusicListener extends NotificationListenerService {
         main.post(() -> { if (observer != null) observer.run(); });
     }
 
+    private static long hiddenCountdown;
+
+    /** Waktu selesai hitung mundur dari notifikasi aplikasi jam, atau 0 bila tidak ada. */
+    static long countdown() {
+        if (instance == null) return 0;
+        long now = System.currentTimeMillis(), nearest = 0;
+        for (StatusBarNotification n : instance.active()) {
+            Notification v = n.getNotification();
+            if (!v.extras.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER)
+                    || !v.extras.getBoolean(Notification.EXTRA_CHRONOMETER_COUNT_DOWN)) continue;
+            if (v.when > now && v.when != hiddenCountdown && (nearest == 0 || v.when < nearest)) {
+                nearest = v.when;
+            }
+        }
+        return nearest;
+    }
+
+    static void hideCountdown() { hiddenCountdown = countdown(); }
+
     static void observe(Runnable r) { observer = r; }
 
     static boolean connected() { return instance != null; }

@@ -22,7 +22,8 @@ import java.util.List;
 class Editor extends FrameLayout {
     private final List<Item> order;
     private final List<ObjectAnimator> shaking = new ArrayList<>();
-    private final GridLayout used, spare;
+    private final FrameLayout used;
+    private final GridLayout spare;
     private final int columns, cell;
     private final TextView spareTitle;
     private Item fresh;
@@ -46,12 +47,14 @@ class Editor extends FrameLayout {
         head.addView(text("Atur tombol", 22), new LinearLayout.LayoutParams(0, -2, 1));
         head.addView(pill("Selesai", done));
         page.addView(head, new LinearLayout.LayoutParams(wide, -2));
-        TextView hint = text("Ketuk untuk menyingkirkan. Tahan lalu geser untuk memindahkan.", 13);
+        TextView hint = text("Ketuk tombol untuk mengubah ukuran, tanda minus untuk "
+                + "menyingkirkan. Tahan lalu geser untuk memindahkan.", 13);
         hint.setAlpha(0.7f);
         hint.setPadding(0, dp(6), 0, dp(14));
         page.addView(hint, new LinearLayout.LayoutParams(wide, -2));
 
-        used = grid();
+        used = new FrameLayout(context);
+        used.setClipChildren(false);
         page.addView(used, new LinearLayout.LayoutParams(wide, -2));
         spareTitle = text("Tambah tombol", 17);
         spareTitle.setPadding(0, dp(20), 0, dp(10));
@@ -63,6 +66,7 @@ class Editor extends FrameLayout {
         page.addView(pill("Kembalikan susunan awal", () -> {
             order.clear();
             order.addAll(Item.standard());
+            for (Item item : Item.values()) Item.resize(getContext(), item, 0);
             changed();
         }), reset);
 
@@ -82,7 +86,8 @@ class Editor extends FrameLayout {
         stop();
         used.removeAllViews();
         spare.removeAllViews();
-        for (Item item : order) addUsed(item);
+        Pack pack = new Pack(columns, 0);
+        for (Item item : order) addUsed(item, pack);
         int count = 0;
         for (Item item : Item.values()) {
             if (item.movable() && !order.contains(item)) { addSpare(item); count++; }
@@ -90,42 +95,59 @@ class Editor extends FrameLayout {
         spareTitle.setVisibility(count == 0 ? GONE : VISIBLE);
     }
 
-    private FrameLayout badged(Item item, int icon, int color) {
+    private FrameLayout badged(Item item, int icon, int color, int wide, int high,
+            boolean large) {
         FrameLayout box = new FrameLayout(getContext());
         box.setClipChildren(false);
-        int size = cell - dp(14);
-        box.addView(new TileView(getContext(), item),
-                new LayoutParams(size, size, Gravity.CENTER));
+        TileView tile = new TileView(getContext(), item);
+        tile.large = large;
+        box.addView(tile, new LayoutParams(wide - dp(14), high - dp(14), Gravity.CENTER));
+        box.addView(badge(icon, color), corner(Gravity.TOP | Gravity.START));
+        return box;
+    }
+
+    private ImageView badge(int icon, int color) {
         ImageView badge = new ImageView(getContext());
         badge.setImageResource(icon);
         badge.setPadding(dp(3), dp(3), dp(3), dp(3));
         badge.setBackground(new Glass(getContext(), 12, color));
-        LayoutParams p = new LayoutParams(dp(22), dp(22), Gravity.TOP | Gravity.START);
-        p.setMargins(dp(4), dp(4), 0, 0);
-        box.addView(badge, p);
-        return box;
+        return badge;
     }
 
-    private void addUsed(Item item) {
-        FrameLayout content = badged(item, R.drawable.ic_minus, 0xE6E0484E);
+    private LayoutParams corner(int gravity) {
+        LayoutParams p = new LayoutParams(dp(22), dp(22), gravity);
+        p.setMargins(dp(4), dp(4), dp(4), dp(4));
+        return p;
+    }
+
+    private void addUsed(Item item, Pack pack) {
+        int size = Item.size(getContext(), item);
+        int w = Item.SPANS[size][0], h = Item.SPANS[size][1];
+        int[] at = pack.place(w, h);
+        FrameLayout content = badged(item, R.drawable.ic_minus, 0xE6E0484E, w * cell, h * cell,
+                size == 2);
+        content.addView(badge(R.drawable.ic_resize, 0xE62F6FE0),
+                corner(Gravity.BOTTOM | Gravity.END));
         FrameLayout holder = new FrameLayout(getContext()) {
             @Override public boolean onInterceptTouchEvent(MotionEvent e) { return true; }
         };
         holder.setClipChildren(false);
-        holder.setContentDescription("Singkirkan " + item.label);
-        holder.addView(content, new LayoutParams(cell, cell));
+        holder.setTag(item);
+        holder.setContentDescription("Atur " + item.label);
+        holder.addView(content, new LayoutParams(w * cell, h * cell));
         holder.setOnTouchListener(new Drag(item));
         if (item == fresh) {
             fresh = null;
-            Motion.enter(holder, 0, dp(40));
+            Motion.enter(holder, 0, dp(24));
         }
-        GridLayout.LayoutParams p = new GridLayout.LayoutParams();
-        p.width = cell;
-        p.height = cell;
+        LayoutParams p = new LayoutParams(w * cell, h * cell, Gravity.TOP | Gravity.LEFT);
+        p.leftMargin = at[0] * cell;
+        p.topMargin = at[1] * cell;
         used.addView(holder, p);
 
-        // Tombol bergoyang selama mode atur.
-        ObjectAnimator shake = ObjectAnimator.ofFloat(content, View.ROTATION, -2.2f, 2.2f);
+        // Tombol bergoyang selama mode atur; yang besar lebih pelan goyangnya.
+        float swing = 2.2f / Math.max(w, h);
+        ObjectAnimator shake = ObjectAnimator.ofFloat(content, View.ROTATION, -swing, swing);
         shake.setDuration(130);
         shake.setRepeatCount(ValueAnimator.INFINITE);
         shake.setRepeatMode(ValueAnimator.REVERSE);
@@ -139,7 +161,7 @@ class Editor extends FrameLayout {
         box.setOrientation(LinearLayout.VERTICAL);
         box.setGravity(Gravity.CENTER_HORIZONTAL);
         box.setClipChildren(false);
-        box.addView(badged(item, R.drawable.ic_plus, 0xE62EAD63),
+        box.addView(badged(item, R.drawable.ic_plus, 0xE62EAD63, cell, cell, false),
                 new LinearLayout.LayoutParams(cell, cell));
         TextView name = text(item.label, 11);
         name.setGravity(Gravity.CENTER);
@@ -167,7 +189,7 @@ class Editor extends FrameLayout {
     private class Drag implements OnTouchListener {
         private final Item item;
         private View view;
-        private float x, y;
+        private float x, y, localX, localY;
         private boolean holding, moved;
         private final Runnable hold = () -> {
             holding = true;
@@ -186,6 +208,8 @@ class Editor extends FrameLayout {
                 case MotionEvent.ACTION_DOWN:
                     x = e.getRawX();
                     y = e.getRawY();
+                    localX = e.getX();
+                    localY = e.getY();
                     holding = moved = false;
                     v.postDelayed(hold, 220);
                     break;
@@ -206,9 +230,16 @@ class Editor extends FrameLayout {
                         // sini membuat aplikasi berhenti.
                         holding = false;
                         Editor.this.post(() -> drop(v, dx, dy));
-                    } else if (!moved) {
+                    } else if (!moved && localX < dp(36) && localY < dp(36)) {
                         v.animate().scaleX(0.2f).scaleY(0.2f).alpha(0).setDuration(180)
                                 .withEndAction(() -> { order.remove(item); changed(); }).start();
+                    } else if (!moved) {
+                        // Ketuk badan tombol: kecil, lebar, besar, lalu kecil lagi.
+                        Haptic.click(getContext());
+                        Item.resize(getContext(), item,
+                                (Item.size(getContext(), item) + 1) % Item.SPANS.length);
+                        fresh = item;
+                        Editor.this.post(Editor.this::rebuild);
                     }
                     break;
                 case MotionEvent.ACTION_CANCEL:
@@ -224,14 +255,24 @@ class Editor extends FrameLayout {
             return true;
         }
 
+        /** Pindah ke tempat tombol yang pusatnya paling dekat dengan titik lepas. */
         private void drop(View v, float dx, float dy) {
-            int column = (int) ((v.getLeft() + dx + cell / 2f) / cell);
-            int row = (int) ((v.getTop() + dy + cell / 2f) / cell);
-            column = Math.max(0, Math.min(columns - 1, column));
-            int target = Math.max(0, Math.min(order.size() - 1,
-                    Math.max(0, row) * columns + column));
+            float cx = v.getLeft() + dx + v.getWidth() / 2f;
+            float cy = v.getTop() + dy + v.getHeight() / 2f;
+            Item nearest = item;
+            double best = Double.MAX_VALUE;
+            for (int i = 0; i < used.getChildCount(); i++) {
+                View other = used.getChildAt(i);
+                double far = Math.hypot(other.getLeft() + other.getWidth() / 2f - cx,
+                        other.getTop() + other.getHeight() / 2f - cy);
+                if (far < best) {
+                    best = far;
+                    nearest = (Item) other.getTag();
+                }
+            }
+            int to = order.indexOf(nearest);
             order.remove(item);
-            order.add(target, item);
+            order.add(Math.max(0, Math.min(order.size(), to)), item);
             changed();
         }
     }
