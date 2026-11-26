@@ -138,6 +138,9 @@ public class MainActivity extends Activity {
         button("Tes popup sekarang", this::test);
         toggle("Popup notifikasi", "popup", true);
         toggle("Suara notifikasi", "sound", true);
+        toggle("Getar saat ada notifikasi", "vibrate", true);
+        note("Suara mengikuti volume dering dan diam saat HP dalam mode getar atau senyap. "
+                + "Bila getar dimatikan, suara bawaan aplikasi lain juga dibisukan.");
         toggle("Sembunyikan isi pesan", "hideContent", false);
         toggle("Sembunyikan popup saat layar penuh", "hideFullscreen", true);
         toggle("Geser kiri atas untuk pusat notifikasi", "leftSwipe", true);
@@ -396,7 +399,8 @@ public class MainActivity extends Activity {
         s.setChecked(Prefs.is(this, key, fallback));
         s.setOnCheckedChangeListener((v, on) -> {
             Prefs.of(this).edit().putBoolean(key, on).commit();
-            if (key.equals("leftSwipe") || key.equals("noSwipeLand") || key.equals("sound") || key.equals("muteNative")) {
+            if (key.equals("leftSwipe") || key.equals("noSwipeLand") || key.equals("sound") || key.equals("muteNative")
+                    || key.equals("vibrate")) {
                 sendBroadcast(new Intent(OverlayService.REFRESH).setPackage(getPackageName()));
             }
         });

@@ -24,6 +24,7 @@ class NoteCard extends LinearLayout {
     private VelocityTracker velocity;
     private Runnable dismiss, pullDown, swipeUp;
     final TextView body;
+    private final LinearLayout words;
 
     NoteCard(Context context, StatusBarNotification n, int tint) {
         super(context);
@@ -55,7 +56,7 @@ class NoteCard extends LinearLayout {
         }
         row.addView(images, new LayoutParams(dp(48), dp(48)));
 
-        LinearLayout words = new LinearLayout(context);
+        words = new LinearLayout(context);
         words.setOrientation(VERTICAL);
         words.setPadding(dp(12), 0, 0, 0);
         LinearLayout head = new LinearLayout(context);
@@ -72,6 +73,13 @@ class NoteCard extends LinearLayout {
         words.addView(body);
         row.addView(words, new LayoutParams(0, -2, 1));
         addView(row, new LayoutParams(-1, -2));
+    }
+
+    /** Keterangan kecil pada kartu teratas sebuah tumpukan. */
+    void more(String value) {
+        TextView t = line(value, 12, 0xB3FFFFFF);
+        t.setPadding(0, dp(3), 0, 0);
+        words.addView(t);
     }
 
     /**
@@ -129,7 +137,7 @@ class NoteCard extends LinearLayout {
         input.setBackground(new Glass(context, 24, 0x22FFFFFF));
         row.addView(input, new LayoutParams(0, -2, 1));
         ImageView send = new ImageView(context);
-        send.setImageResource(R.drawable.ic_play);
+        send.setImageResource(R.drawable.ic_send);
         send.setColorFilter(Theme.onAccent(context));
         send.setContentDescription("Kirim");
         send.setPadding(dp(13), dp(13), dp(13), dp(13));

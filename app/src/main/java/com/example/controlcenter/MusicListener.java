@@ -37,7 +37,9 @@ public class MusicListener extends NotificationListenerService {
         super.onCreate();
         sounds = new SoundPool.Builder().setMaxStreams(1)
                 .setAudioAttributes(new AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                        // Bukan USAGE_NOTIFICATION: petunjuk pembisu suara bawaan
+                        // ikut membisukan semua suara dengan jenis tersebut.
+                        .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
                         .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
                 .build();
         sound = sounds.load(this, R.raw.notif, 1);
@@ -122,9 +124,14 @@ public class MusicListener extends NotificationListenerService {
 
     /** Minta sistem membisukan suara bawaan agar tidak bertabrakan dengan suara kita. */
     private void hints() {
-        boolean mute = Prefs.is(this, "sound", true) && Prefs.is(this, "muteNative", true);
-        try { requestListenerHints(mute ? HINT_HOST_DISABLE_NOTIFICATION_EFFECTS : 0); }
+        try { requestListenerHints(muting() ? HINT_HOST_DISABLE_NOTIFICATION_EFFECTS : 0); }
         catch (Exception ignored) { }
+    }
+
+    /** Efek bawaan dibisukan bila diganti suara kita, atau bila getaran dimatikan. */
+    private boolean muting() {
+        return (Prefs.is(this, "sound", true) && Prefs.is(this, "muteNative", true))
+                || !Prefs.is(this, "vibrate", true);
     }
 
     static void applyHints() {
@@ -132,20 +139,22 @@ public class MusicListener extends NotificationListenerService {
     }
 
     private void playSound() {
-        if (!Prefs.is(this, "sound", true)) return;
+        boolean tone = Prefs.is(this, "sound", true);
+        boolean muted = muting();
+        if (!tone && !muted) return;
         int mode = getSystemService(AudioManager.class).getRingerMode();
         if (mode == AudioManager.RINGER_MODE_SILENT) return;
         long now = SystemClock.elapsedRealtime();
         if (now - lastSound < 2500) return;
         lastSound = now;
-        boolean muted = Prefs.is(this, "muteNative", true);
-        // Getar bawaan ikut dibisukan, jadi digantikan di sini.
-        if (muted) {
+        // Getar bawaan ikut dibisukan, jadi digantikan di sini bila masih diinginkan.
+        if (muted && Prefs.is(this, "vibrate", true)) {
             getSystemService(Vibrator.class).vibrate(
                     VibrationEffect.createWaveform(new long[]{0, 120, 80, 120}, -1));
         }
-        if (mode != AudioManager.RINGER_MODE_NORMAL) return;
-        sounds.play(sound, 1, 1, 1, 0, 1);
+        if (!tone || mode != AudioManager.RINGER_MODE_NORMAL) return;
+        int stream = sounds.play(sound, 1, 1, 1, 0, 1);
+        android.util.Log.i("ControlCenter", "suara notifikasi diputar: " + stream);
     }
 
     private static String signature(StatusBarNotification n) {
