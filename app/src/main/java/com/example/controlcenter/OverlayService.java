@@ -70,8 +70,11 @@ public class OverlayService extends AccessibilityService {
         if (!Prefs.is(this, "chargeAnim", true) || charging != null
                 || !getSystemService(PowerManager.class).isInteractive()) return;
         if (Prefs.is(this, "hideFullscreen", true) && fullscreen()) return;
-        android.os.BatteryManager battery = getSystemService(android.os.BatteryManager.class);
-        int level = battery.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY);
+        // Sumber yang sama dengan angka baterai di status bar.
+        Intent battery = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+        if (battery == null) return;
+        int level = battery.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, 0) * 100
+                / Math.max(1, battery.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, 100));
         Glass.load(this);
         ChargeView view = new ChargeView(this, Math.max(0, Math.min(100, level)));
         // Tidak menerima sentuhan, jadi layar di bawahnya tetap bisa dipakai.
