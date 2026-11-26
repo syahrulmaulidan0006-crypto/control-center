@@ -227,6 +227,11 @@ class Panel extends Sheet {
             controls.toast("Buka aplikasi dan berikan izin akses notifikasi");
             controls.launch(new android.content.Intent(getContext(), MainActivity.class));
         }, service::closePanel);
+        music.setOnLongClickListener(v -> {
+            v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+            showMusic(v);
+            return true;
+        });
         LinearLayout.LayoutParams m = new LinearLayout.LayoutParams(side, side);
         if (land) m.topMargin = gap; else m.leftMargin = gap;
         row.addView(music, m);
@@ -284,6 +289,7 @@ class Panel extends Sheet {
             } catch (SecurityException e) { controls.toast("Izin Jangan Ganggu diperlukan"); }
         }, null);
         sound.setContentDescription("Volume");
+        sound.announce = true;
         sound.onHold = () -> showPicker(Item.VOLUME, sound);
         sound.levelIcons(R.drawable.ic_volume0, R.drawable.ic_volume1);
         LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(unit, -1);
@@ -486,9 +492,28 @@ class Panel extends Sheet {
 
     private void showPicker(Item item, View origin) {
         if (popup != null || editor != null) return;
+        show(new Picker(getContext(), controls, item, Math.min(width, dp(400)),
+                this::closePicker), origin);
+    }
+
+    /** Ditahan: kartu musik membesar menjadi jendela dengan gambar artis besar. */
+    private void showMusic(View origin) {
+        if (popup != null || editor != null || expanded != null) return;
+        int wide = Math.min(land ? dp(340) : width, dp(380));
+        FrameLayout layer = new FrameLayout(getContext());
+        layer.setBackgroundColor(0x33000000);
+        layer.setOnClickListener(v -> closePicker());
+        MusicCard card = new MusicCard(getContext(), wide, this::output,
+                () -> controls.launch(new android.content.Intent(getContext(),
+                        MainActivity.class)), service::closePanel, true);
+        card.setClickable(true);
+        layer.addView(card, new LayoutParams(wide, -2, Gravity.CENTER));
+        show(layer, origin);
+    }
+
+    private void show(FrameLayout window, View origin) {
         source = origin;
-        popup = new Picker(getContext(), controls, item, Math.min(width, dp(400)),
-                this::closePicker);
+        popup = window;
         addView(popup, new LayoutParams(-1, -1));
         View behind = expanded != null ? expanded : scroll;
         blur(behind, true);

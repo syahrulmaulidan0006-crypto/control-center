@@ -33,7 +33,7 @@ class Banner extends FrameLayout {
 
     private void shade(android.view.View v) {
         if (v instanceof android.widget.TextView) {
-            ((android.widget.TextView) v).setShadowLayer(dp(3), 0, dp(1), 0xB3000000);
+            ((android.widget.TextView) v).setShadowLayer(dp(4), 0, dp(1), 0xF2000000);
         } else if (v instanceof android.view.ViewGroup) {
             android.view.ViewGroup group = (android.view.ViewGroup) v;
             for (int i = 0; i < group.getChildCount(); i++) shade(group.getChildAt(i));

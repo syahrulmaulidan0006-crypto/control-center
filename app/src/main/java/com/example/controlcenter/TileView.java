@@ -86,6 +86,7 @@ class TileView extends View {
     }
 
     @Override public boolean performClick() {
+        Haptic.click(getContext());
         act();
         return super.performClick();
     }

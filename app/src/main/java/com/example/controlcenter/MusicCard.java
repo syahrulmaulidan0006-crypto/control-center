@@ -35,6 +35,9 @@ class MusicCard extends LinearLayout {
     private final TextView title, artist;
     private MediaController controller;
     private boolean listening, fadeArt;
+    /** Versi besar dipakai di jendela mengambang. */
+    private final boolean big;
+    private final int artPadding;
     private Boolean shownPlaying;
     private Runnable onOpen = () -> { };
 
@@ -55,11 +58,18 @@ class MusicCard extends LinearLayout {
 
     MusicCard(Context context, int side, Consumer<String> output, Runnable needPermission,
             Runnable closePanel) {
+        this(context, side, output, needPermission, closePanel, false);
+    }
+
+    MusicCard(Context context, int side, Consumer<String> output, Runnable needPermission,
+            Runnable closePanel, boolean big) {
         super(context);
+        this.big = big;
         audio = context.getSystemService(AudioManager.class);
         sessions = context.getSystemService(MediaSessionManager.class);
         setOrientation(VERTICAL);
-        setPadding(dp(12), dp(12), dp(12), dp(6));
+        if (big) setPadding(dp(22), dp(22), dp(22), dp(14));
+        else setPadding(dp(12), dp(12), dp(12), dp(6));
 
         // Atas: sampul kecil di kiri, tombol keluaran suara di kanan.
         LinearLayout top = new LinearLayout(context);
@@ -67,7 +77,7 @@ class MusicCard extends LinearLayout {
         art.setContentDescription("Sampul album");
         art.setOutlineProvider(new ViewOutlineProvider() {
             @Override public void getOutline(View v, Outline o) {
-                o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), dp(11));
+                o.setRoundRect(0, 0, v.getWidth(), v.getHeight(), dp(big ? 24 : 11));
             }
         });
         art.setClipToOutline(true);
@@ -82,8 +92,15 @@ class MusicCard extends LinearLayout {
         // supaya judul, artis, dan tombol tetap muat.
         int words = Math.round(40 * getResources().getDisplayMetrics().scaledDensity);
         int artSize = Math.max(dp(36), Math.min(dp(66), side - dp(62) - words));
+        if (big) {
+            // Gambar artis besar di tengah, dibatasi tinggi layar agar semua muat.
+            artSize = Math.min(side - dp(44),
+                    Math.round(getResources().getDisplayMetrics().heightPixels * 0.34f));
+            top.setGravity(Gravity.CENTER);
+        }
+        artPadding = big ? artSize / 4 : dp(10);
         top.addView(art, new LayoutParams(artSize, artSize));
-        top.addView(new View(context), new LayoutParams(0, 1, 1));
+        if (!big) top.addView(new View(context), new LayoutParams(0, 1, 1));
         ImageView out = new ImageView(context);
         out.setImageResource(R.drawable.ic_output);
         out.setContentDescription("Keluaran suara");
@@ -93,16 +110,21 @@ class MusicCard extends LinearLayout {
             pop(v);
             output.accept(controller == null ? null : controller.getPackageName());
         });
-        top.addView(out, new LayoutParams(dp(30), dp(30)));
+        if (!big) top.addView(out, new LayoutParams(dp(30), dp(30)));
         addView(top, new LayoutParams(-1, -2));
-        addView(new View(context), new LayoutParams(1, 0, 1));
+        addView(new View(context), big ? new LayoutParams(1, dp(18))
+                : new LayoutParams(1, 0, 1));
 
-        title = line(15, Color.WHITE);
+        title = line(big ? 20 : 15, Color.WHITE);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         title.setEllipsize(TextUtils.TruncateAt.MARQUEE);
         title.setMarqueeRepeatLimit(-1);
         title.setSelected(true);
-        artist = line(12, 0xB3FFFFFF);
+        artist = line(big ? 15 : 12, 0xB3FFFFFF);
+        if (big) {
+            title.setGravity(Gravity.CENTER);
+            artist.setGravity(Gravity.CENTER);
+        }
         title.setPadding(dp(3), 0, dp(3), 0);
         artist.setPadding(dp(3), 0, dp(3), 0);
         addView(title, new LayoutParams(-1, -2));
@@ -117,6 +139,14 @@ class MusicCard extends LinearLayout {
         next = button(buttons, R.drawable.ic_next, "Berikutnya",
                 KeyEvent.KEYCODE_MEDIA_NEXT, 10);
         addView(buttons, new LayoutParams(-1, -2));
+        if (big) {
+            out.setPadding(dp(12), dp(8), dp(12), dp(8));
+            out.setBackground(new Glass(context, 22, 0x26FFFFFF));
+            LayoutParams under = new LayoutParams(dp(96), dp(40));
+            under.gravity = Gravity.CENTER_HORIZONTAL;
+            under.topMargin = dp(8);
+            addView(out, under);
+        }
         refresh();
     }
 
@@ -201,7 +231,7 @@ class MusicCard extends LinearLayout {
                 tint = (one.getPixel(0, 0) & 0x00FFFFFF) | 0x66000000;
             } catch (Exception ignored) { }
         } else {
-            art.setPadding(dp(10), dp(10), dp(10), dp(10));
+            art.setPadding(artPadding, artPadding, artPadding, artPadding);
             art.setBackgroundColor(0x38FFFFFF);
             art.setScaleType(ImageView.ScaleType.FIT_CENTER);
             art.setImageResource(R.drawable.ic_music);
@@ -214,7 +244,9 @@ class MusicCard extends LinearLayout {
             fade.start();
         }
         fadeArt = false;
-        setBackground(new Glass(getContext(), 32, tint));
+        // Jendela besar diberi dasar gelap agar tulisan tetap jelas.
+        if (big && cover == null) tint = 0x661B2440;
+        setBackground(new Glass(getContext(), big ? 40 : 32, tint));
         updatePlay();
     }
 
@@ -242,8 +274,9 @@ class MusicCard extends LinearLayout {
         b.setImageResource(res);
         b.setContentDescription(label);
         b.setPadding(dp(inset), dp(inset), dp(inset), dp(inset));
-        b.setOnClickListener(v -> { pop(v); send(key); });
-        row.addView(b, new LayoutParams(0, dp(40), 1));
+        b.setOnClickListener(v -> { Haptic.click(getContext()); pop(v); send(key); });
+        if (big) b.setPadding(dp(inset + 4), dp(inset + 4), dp(inset + 4), dp(inset + 4));
+        row.addView(b, new LayoutParams(0, dp(big ? 64 : 40), 1));
         return b;
     }
 

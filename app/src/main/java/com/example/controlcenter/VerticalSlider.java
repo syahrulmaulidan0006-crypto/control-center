@@ -27,6 +27,12 @@ class VerticalSlider extends View {
     private boolean active;
     private final int covered;
     private float startY, startValue;
+    /** Kepekatan angka persen. */
+    private float label;
+    private android.animation.ValueAnimator labelFade;
+    private final Runnable hideLabel = () -> label(0);
+    /** Angka juga muncul bila nilainya diubah dari luar, misalnya tombol volume. */
+    boolean announce;
     private boolean moved, held;
     /** Dijalankan saat slider ditekan lama tanpa digeser. */
     Runnable onHold;
@@ -57,13 +63,26 @@ class VerticalSlider extends View {
 
     /** Ikuti perubahan dari luar, misalnya tombol volume fisik. */
     void sync(float next) {
-        if (touching || Math.abs(next - value) < 0.004f) return;
+        if (touching || Math.abs(next - value) < 0.004f || next == target) return;
+        if (announce && isShown()) {
+            label(1);
+            removeCallbacks(hideLabel);
+            postDelayed(hideLabel, 1100);
+        }
         if (animator != null) animator.cancel();
         target = next;
         animator = android.animation.ValueAnimator.ofFloat(value, next);
         animator.setDuration(160);
         animator.addUpdateListener(a -> { value = (float) a.getAnimatedValue(); invalidate(); });
         animator.start();
+    }
+
+    private void label(float to) {
+        if (labelFade != null) labelFade.cancel();
+        labelFade = android.animation.ValueAnimator.ofFloat(label, to);
+        labelFade.setDuration(to > 0 ? 130 : 320);
+        labelFade.addUpdateListener(a -> { label = (float) a.getAnimatedValue(); invalidate(); });
+        labelFade.start();
     }
 
     @Override protected void onDraw(Canvas c) {
@@ -93,6 +112,16 @@ class VerticalSlider extends View {
         // Ikon menjadi gelap bila tertutup isian terang.
         icon.setTint(h * (1 - value) < top + size / 2f ? covered : 0xFFFFFFFF);
         icon.draw(c);
+        if (label > 0) {
+            float y = w * 0.66f;
+            paint.setColor(h * (1 - value) < y - 5 * d ? covered : 0xFFFFFFFF);
+            paint.setAlpha(Math.round(paint.getAlpha() * label));
+            paint.setTextAlign(Paint.Align.CENTER);
+            paint.setTextSize(Math.min(w * 0.25f, 17 * d));
+            paint.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+            c.drawText(Math.round(value * 100) + "%", r, y, paint);
+            paint.setTypeface(android.graphics.Typeface.DEFAULT);
+        }
     }
 
     @Override public boolean onTouchEvent(MotionEvent e) {
@@ -106,6 +135,10 @@ class VerticalSlider extends View {
             startValue = value;
             if (animator != null) animator.cancel();
             if (onHold != null) postDelayed(hold, 450);
+            if (active) {
+                removeCallbacks(hideLabel);
+                label(1);
+            }
             animate().scaleX(1.05f).scaleY(1.03f).setDuration(160).start();
             return true;
         }
@@ -119,13 +152,18 @@ class VerticalSlider extends View {
             // Digeser: mengikuti jarak jari. Diketuk: langsung ke titik sentuh.
             float next = moved ? startValue + (startY - e.getY()) / getHeight()
                     : 1 - e.getY() / getHeight();
+            float before = value;
             value = Math.max(0f, Math.min(1f, next));
+            // Terasa saat mentok di bawah atau di atas.
+            if (value != before && (value == 0 || value == 1)) Haptic.tick(getContext());
             listener.onChange(value);
             invalidate();
         }
         if (up || a == MotionEvent.ACTION_CANCEL) {
             removeCallbacks(hold);
             postDelayed(() -> touching = false, 250);
+            removeCallbacks(hideLabel);
+            postDelayed(hideLabel, 700);
             animate().scaleX(1).scaleY(1).setDuration(280)
                     .setInterpolator(new android.view.animation.OvershootInterpolator(2.5f))
                     .start();

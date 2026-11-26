@@ -134,6 +134,7 @@ class Deck extends FrameLayout {
         dots.position = place(current);
         dots.invalidate();
         if (go) {
+            Haptic.tick(getContext());
             removeView(gone);
             chosen.accept(current);
         } else {

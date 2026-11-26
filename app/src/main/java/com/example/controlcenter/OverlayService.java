@@ -61,6 +61,39 @@ public class OverlayService extends AccessibilityService {
         }
     };
 
+    private ChargeView charging;
+    private final BroadcastReceiver power = new BroadcastReceiver() {
+        @Override public void onReceive(Context c, Intent i) { showCharging(); }
+    };
+
+    private void showCharging() {
+        if (!Prefs.is(this, "chargeAnim", true) || charging != null
+                || !getSystemService(PowerManager.class).isInteractive()) return;
+        if (Prefs.is(this, "hideFullscreen", true) && fullscreen()) return;
+        // Sumber yang sama dengan angka baterai di status bar.
+        Intent battery = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+        if (battery == null) return;
+        int level = battery.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, 0) * 100
+                / Math.max(1, battery.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, 100));
+        Glass.load(this);
+        ChargeView view = new ChargeView(this, Math.max(0, Math.min(100, level)));
+        // Tidak menerima sentuhan, jadi layar di bawahnya tetap bisa dipakai.
+        WindowManager.LayoutParams lp = params(dp(220), dp(220),
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                        | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE);
+        lp.gravity = Gravity.CENTER;
+        try { wm.addView(view, lp); }
+        catch (RuntimeException e) { return; }
+        charging = view;
+        android.util.Log.i("ControlCenter", "animasi cas: " + level);
+        view.play(this::removeCharging);
+    }
+
+    private void removeCharging() {
+        if (charging != null && charging.isAttachedToWindow()) wm.removeView(charging);
+        charging = null;
+    }
+
     @Override public void onAccessibilityEvent(AccessibilityEvent event) { }
 
     @Override public void onInterrupt() { }
@@ -86,6 +119,12 @@ public class OverlayService extends AccessibilityService {
             registerReceiver(ticker, time);
         }
         Focus.check(this, controls);
+        IntentFilter plugged = new IntentFilter(Intent.ACTION_POWER_CONNECTED);
+        if (Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(power, plugged, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(power, plugged);
+        }
         android.service.notification.NotificationListenerService.requestRebind(
                 new android.content.ComponentName(this, MusicListener.class));
     }
@@ -118,9 +157,11 @@ public class OverlayService extends AccessibilityService {
         if (instance != null) {
             unregisterReceiver(refresh);
             unregisterReceiver(ticker);
+            unregisterReceiver(power);
         }
         instance = null;
         removePanel();
+        removeCharging();
         if (banner != null) removeBanner(banner);
         removeHandles();
         if (controls != null) controls.release();
@@ -237,6 +278,7 @@ public class OverlayService extends AccessibilityService {
     private void addPanel(boolean notifications) {
         removePanel();
         if (banner != null) banner.leave();
+        Glass.load(this);
         panel = notifications ? new Center(this, controls) : new Panel(this, controls);
         android.util.Log.i("ControlCenter", "panel dibuka, pusat=" + notifications);
         panel.setBackground(new ColorDrawable(BACKGROUND));
@@ -298,6 +340,7 @@ public class OverlayService extends AccessibilityService {
             // Popup lama keluar dengan animasi selagi yang baru masuk.
             banner.leave();
         }
+        Glass.load(this);
         Banner next = new Banner(this, note);
         bannerParams = params(Math.min(getResources().getDisplayMetrics().widthPixels, dp(440)),
                 -2, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE);
