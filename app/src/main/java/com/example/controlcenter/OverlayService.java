@@ -181,6 +181,10 @@ public class OverlayService extends AccessibilityService {
             tracker[0].addMovement(raw);
             raw.recycle();
             float dy = e.getRawY() - start[0];
+            if (a != MotionEvent.ACTION_MOVE) {
+                android.util.Log.i("ControlCenter", "geser kiri=" + left + " aksi=" + a
+                        + " dy=" + dy + " aktif=" + active[0]);
+            }
             if (a == MotionEvent.ACTION_MOVE) {
                 if (!active[0] && dy > dp(8)) {
                     active[0] = true;

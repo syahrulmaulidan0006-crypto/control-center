@@ -29,19 +29,17 @@ adb shell input keyevent KEYCODE_BACK; sleep 2
 adb shell input keyevent KEYCODE_HOME; sleep 2
 adb shell input swipe $((W*85/100)) 5 $((W*85/100)) 900 60
 sleep 3; shot panel
-# layar atur tombol
-adb shell input tap 100 150; sleep 2; shot atur
-adb shell input swipe 540 1900 540 400 300; sleep 2; shot atur2
-adb shell input tap 170 1500; sleep 2; shot atur3
-adb shell input keyevent KEYCODE_BACK; sleep 2; shot panel2
-adb shell input tap 100 150; sleep 2
-adb shell input draganddrop 173 460 650 460 900; sleep 2; shot geser
-adb shell input tap 173 700; sleep 2; shot hapus
-adb shell input keyevent KEYCODE_BACK; sleep 2; shot panel3
-adb shell input keyevent KEYCODE_BACK; sleep 2
-adb shell input swipe $((W*15/100)) 5 $((W*15/100)) 900 250
-sleep 3; shot pusat
-adb shell input keyevent KEYCODE_BACK; sleep 2
+for n in 1 2 3 4 5 6; do
+  adb shell input keyevent KEYCODE_HOME; sleep 3
+  echo "--- geser ke-$n"
+  adb logcat -c
+  adb shell dumpsys window windows | grep -E "Window #|mCurrentFocus" | head -12
+  adb shell input swipe $((W*85/100)) 5 $((W*85/100)) 900 $((n*60))
+  sleep 3
+  adb logcat -d | grep -E "ControlCenter|InputDispatcher|pilfer|Pilfer"
+  shot g$n
+  adb shell input keyevent KEYCODE_BACK; sleep 2
+done
 adb shell am start -a android.settings.SETTINGS; sleep 3
 adb shell settings put system accelerometer_rotation 0
 adb shell settings put system user_rotation 1
