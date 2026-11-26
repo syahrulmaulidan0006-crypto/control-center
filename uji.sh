@@ -22,24 +22,24 @@ adb shell cmd notification post -t Rina pesan1 'Pesan_kedua'
 sleep 2; shot popup2
 sleep 8
 W=$(adb shell wm size | grep -o '[0-9]*x' | tr -d x)
-adb shell input swipe $((W*85/100)) 5 $((W*85/100)) 900 250
-sleep 3; shot panel0
-adb logcat -d | grep -E "ControlCenter|AndroidRuntime"
-adb shell input keyevent KEYCODE_BACK; sleep 2
-adb shell input keyevent KEYCODE_HOME; sleep 2
-adb shell input swipe $((W*85/100)) 5 $((W*85/100)) 900 60
-sleep 3; shot panel
-for n in 1 2 3 4 5 6; do
+buka() {
   adb shell input keyevent KEYCODE_HOME; sleep 3
-  echo "--- geser ke-$n"
-  adb logcat -c
-  adb shell dumpsys window windows | grep -E "Window #|mCurrentFocus" | head -12
-  adb shell input swipe $((W*85/100)) 5 $((W*85/100)) 900 $((n*60))
+  adb shell input swipe $((W*$1/100)) 5 $((W*$1/100)) 900 $2
   sleep 3
-  adb logcat -d | grep -E "ControlCenter|InputDispatcher|pilfer|Pilfer"
-  shot g$n
-  adb shell input keyevent KEYCODE_BACK; sleep 2
+}
+tutup() { adb shell input keyevent KEYCODE_BACK; sleep 2; }
+n=1
+for ms in 40 80 150 250 400 600; do
+  buka 85 $ms; shot g$n; tutup; n=$((n+1))
 done
+buka 85 250; shot panel
+adb shell input tap 100 150; sleep 2; shot atur
+adb shell input draganddrop 173 460 650 460 900; sleep 2; shot geser
+adb shell input tap 173 700; sleep 2; shot hapus
+tutup; shot panel3
+tutup
+buka 15 80; shot pusat; tutup
+adb shell input keyevent KEYCODE_HOME; sleep 2
 adb shell am start -a android.settings.SETTINGS; sleep 3
 adb shell settings put system accelerometer_rotation 0
 adb shell settings put system user_rotation 1

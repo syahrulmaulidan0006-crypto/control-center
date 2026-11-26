@@ -181,10 +181,6 @@ public class OverlayService extends AccessibilityService {
             tracker[0].addMovement(raw);
             raw.recycle();
             float dy = e.getRawY() - start[0];
-            if (a != MotionEvent.ACTION_MOVE) {
-                android.util.Log.i("ControlCenter", "geser kiri=" + left + " aksi=" + a
-                        + " dy=" + dy + " aktif=" + active[0]);
-            }
             if (a == MotionEvent.ACTION_MOVE) {
                 if (!active[0] && dy > dp(8)) {
                     active[0] = true;
@@ -193,13 +189,22 @@ public class OverlayService extends AccessibilityService {
                 if (active[0]) drag(Math.min(1f, dy / dp(280)));
             } else if (a == MotionEvent.ACTION_UP || a == MotionEvent.ACTION_CANCEL) {
                 tracker[0].computeCurrentVelocity(1000);
-                boolean open = tracker[0].getYVelocity() > dp(400) || dy > dp(130);
-                if (tracker[0].getYVelocity() < -dp(400)) open = false;
+                float speed = tracker[0].getYVelocity();
                 tracker[0].recycle();
                 tracker[0] = null;
-                if (active[0]) { if (open) openFully(); else closePanel(); }
-                // Geseran sangat cepat bisa tiba tanpa kejadian gerak sama sekali.
-                else if (a == MotionEvent.ACTION_UP && dy > dp(40)) {
+                if (a == MotionEvent.ACTION_CANCEL && dy > dp(16)) {
+                    // Sistem merebut geseran untuk membuka panel bawaan: ambil alih kembali.
+                    if (!active[0]) addPanel(left);
+                    openFully();
+                    dismissNative();
+                    return true;
+                }
+                boolean open = speed > dp(400) || dy > dp(130);
+                if (speed < -dp(400)) open = false;
+                if (active[0]) {
+                    if (open) openFully(); else closePanel();
+                } else if (a == MotionEvent.ACTION_UP && dy > dp(40)) {
+                    // Geseran sangat cepat bisa tiba tanpa kejadian gerak sama sekali.
                     addPanel(left);
                     openFully();
                 }
@@ -225,6 +230,15 @@ public class OverlayService extends AccessibilityService {
         blur = 1;
         panel.setProgress(0);
         wm.addView(panel, panelParams);
+    }
+
+    /** Menutup panel notifikasi bawaan yang ikut terbuka (Android 12+). */
+    private void dismissNative() {
+        if (Build.VERSION.SDK_INT < 31 || handle == null) return;
+        Runnable dismiss = () -> performGlobalAction(GLOBAL_ACTION_DISMISS_NOTIFICATION_SHADE);
+        dismiss.run();
+        handle.postDelayed(dismiss, 120);
+        handle.postDelayed(dismiss, 400);
     }
 
     /** Izinkan keyboard muncul untuk kolom kata sandi. */
