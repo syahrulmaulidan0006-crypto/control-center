@@ -331,6 +331,7 @@ class Panel extends Sheet {
         if (editor != null || popup != null || expanded != null) return;
         editor = new Editor(getContext(), width, land ? 8 : 4, this::closeEditor);
         addView(editor, new LayoutParams(-1, -1));
+        service.dots(false);
         blur(scroll, true);
         scroll.animate().alpha(0).setDuration(220).start();
         editor.setAlpha(0);
@@ -344,6 +345,7 @@ class Panel extends Sheet {
         Editor old = editor;
         if (old == null) return;
         editor = null;
+        service.dots(true);
         fill();
         blur(scroll, false);
         scroll.animate().alpha(1).setDuration(220).start();

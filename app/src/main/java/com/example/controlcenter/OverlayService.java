@@ -363,6 +363,8 @@ public class OverlayService extends AccessibilityService {
         return true;
     }
 
+    void dots(boolean visible) { if (deck != null) deck.dots(visible); }
+
     void page(float dx) { if (deck != null) deck.drag(dx); }
 
     void endPage(float velocity, boolean lifted) {

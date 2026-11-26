@@ -98,11 +98,10 @@ class Picker extends FrameLayout {
         list.setPadding(0, dp(6), 0, 0);
         ScrollView scroll = new ScrollView(context) {
             @Override protected void onMeasure(int w, int h) {
+                int screen = getResources().getDisplayMetrics().heightPixels;
+                // Layar mendatar lebih pendek, jadi sisakan ruang untuk judul dan tombol.
                 super.onMeasure(w, MeasureSpec.makeMeasureSpec(
-                        getResources().getDisplayMetrics().heightPixels
-                                * 2 / (getResources().getDisplayMetrics().heightPixels
-                                < dp(500) ? 6 : 5),
-                        MeasureSpec.AT_MOST));
+                        screen * (screen < dp(500) ? 42 : 58) / 100, MeasureSpec.AT_MOST));
             }
         };
         scroll.setVerticalScrollBarEnabled(false);

@@ -52,24 +52,22 @@ adb shell cmd notification post -t Andi cepat2 'Dua'; sleep 1; shot ganti
 sleep 10
 echo "jendela sisa: $(adb shell dumpsys window windows | grep -c 'Window #.*controlcenter')"
 adb shell cmd notification allow_dnd com.example.controlcenter
+mode() { echo "$1: $(adb shell dumpsys notification | grep -m1 -oE 'mZenMode=[A-Z_]+') terang=$(adb shell settings get system screen_brightness)"; }
+adb shell settings put system screen_brightness 150
 buka 85 250
-adb shell input swipe 150 1900 950 1900 2500 & sleep 1.3; shot geser1; wait; sleep 2; shot geser2
-adb shell input swipe 950 1500 150 1500 200; sleep 2; shot geser3
-adb shell input swipe 150 1900 950 1900 200; sleep 2
-adb shell input swipe 800 700 150 700 200; sleep 2; shot geser4
-adb shell input swipe 414 840 414 840 800; sleep 2; shot fokus
-adb shell input tap 540 1068; sleep 2; shot tidur
-adb shell dumpsys notification | grep -m3 -E "mZenMode="
-echo "terang: $(adb shell settings get system screen_brightness)"
-tutup; shot sesudahtidur
-adb shell input tap 414 840; sleep 2
-adb shell dumpsys notification | grep -m3 -E "mZenMode="
-echo "terang: $(adb shell settings get system screen_brightness)"
+mode awal
+adb shell input swipe 163 840 163 840 800; sleep 2; shot fokus
+adb shell input tap 540 1085; sleep 2; shot tidur; mode sesudah-pilih-tidur
+tutup; shot ikontidur
+adb shell input tap 163 840; sleep 2; mode sesudah-ketuk-lagi
+adb shell input swipe 163 840 163 840 800; sleep 2
+adb shell input tap 540 1630; sleep 2; shot jadwal; mode jadwal
+tutup
+adb shell input swipe 411 1335 411 1335 800; sleep 2; shot timer; tutup
 adb shell input swipe 663 963 663 963 800; sleep 2; shot kecerahan; tutup
-adb shell input swipe 165 1086 165 1086 800; sleep 2; shot senter; tutup
-adb shell input swipe 663 1335 663 1335 800; sleep 2; shot timer; tutup
-adb shell input swipe 800 285 800 285 100; sleep 2; shot kotak
-adb shell input swipe 700 1400 700 1400 800; sleep 2; shot hotspot; tutup; tutup; tutup
+adb shell input swipe 225 470 225 470 100; sleep 2; shot kotak
+adb shell input swipe 300 1470 300 1470 800; sleep 2; shot hotspot; tutup; tutup
+adb shell input tap 100 150; sleep 2; shot atur5; tutup; tutup
 adb logcat -d | grep -E "AndroidRuntime|ControlCenter" | tail -30
 adb shell input keyevent KEYCODE_HOME; sleep 2
 adb shell am start -a android.settings.SETTINGS; sleep 3

@@ -41,6 +41,11 @@ class Deck extends FrameLayout {
 
     void fade(float shown) { dots.setAlpha(shown); }
 
+    /** Titik disembunyikan selagi ada jendela di atas halaman. */
+    void dots(boolean visible) {
+        dots.animate().scaleX(visible ? 1 : 0).scaleY(visible ? 1 : 0).setDuration(220).start();
+    }
+
     boolean paging() { return next != null; }
 
     void begin(Sheet other) {
