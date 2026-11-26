@@ -71,16 +71,29 @@ public class MusicListener extends NotificationListenerService {
         // Pesan baru memperbarui notifikasi yang sama, jadi tetap harus muncul.
         boolean once = (n.getNotification().flags & Notification.FLAG_ONLY_ALERT_ONCE) != 0;
         if (before != null && once && !message(n)) return;
-        if (Prefs.blocked(this).contains(n.getPackageName())) return;
+        if (Prefs.blocked(this).contains(n.getPackageName())) {
+            Diag.popup(this, "tidak tampil, aplikasi dimatikan di daftar");
+            return;
+        }
         Ranking ranking = new Ranking();
         if (getCurrentRanking().getRanking(n.getKey(), ranking)
-                && ranking.getImportance() < NotificationManager.IMPORTANCE_LOW) return;
-        if (getCurrentInterruptionFilter() != INTERRUPTION_FILTER_ALL) return;
+                && ranking.getImportance() < NotificationManager.IMPORTANCE_LOW) {
+            Diag.popup(this, "tidak tampil, notifikasi diset sangat senyap");
+            return;
+        }
+        int filter = getCurrentInterruptionFilter();
+        if (filter != INTERRUPTION_FILTER_ALL && filter != INTERRUPTION_FILTER_UNKNOWN) {
+            Diag.popup(this, "tidak tampil, Jangan Ganggu aktif");
+            return;
+        }
         applyHints();
         playSound();
         main.post(() -> {
             // Popup bawaan disingkirkan hanya bila popup kita benar-benar tampil.
-            if (OverlayService.banner(n) && Prefs.is(this, "removeNative", false)
+            if (!OverlayService.running()) {
+                Diag.popup(this, "tidak tampil, layanan Aksesibilitas tidak berjalan");
+            }
+            if (OverlayService.banner(n) && Prefs.is(this, "removeNative", true)
                     && n.isClearable() && !urgent(n)) {
                 held.put(n.getKey(), n);
                 dismissNative(n.getKey());
@@ -152,7 +165,8 @@ public class MusicListener extends NotificationListenerService {
     /** Hanya notifikasi biasa: bukan musik, proses berjalan, atau ringkasan grup. */
     private boolean visible(StatusBarNotification n) {
         Notification v = n.getNotification();
-        if (n.getPackageName().equals(getPackageName())) return false;
+        if (n.getPackageName().equals(getPackageName())
+                && !v.extras.getBoolean("cc.tes")) return false;
         if (n.isOngoing() || (v.flags & Notification.FLAG_GROUP_SUMMARY) != 0) return false;
         if (v.extras.containsKey(Notification.EXTRA_MEDIA_SESSION)) return false;
         return !Notes.title(n).isEmpty()

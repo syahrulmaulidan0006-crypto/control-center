@@ -15,7 +15,6 @@ import android.content.res.Configuration;
 import android.app.KeyguardManager;
 import android.os.PowerManager;
 import android.service.notification.StatusBarNotification;
-import android.view.WindowInsets;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
@@ -147,15 +146,24 @@ public class OverlayService extends AccessibilityService {
     /** Area transparan di status bar: kanan Control Center, kiri pusat notifikasi. */
     private View showHandle(boolean left) {
         if (left && !Prefs.is(this, "leftSwipe", true)) return null;
+        boolean land = getResources().getConfiguration().orientation
+                == Configuration.ORIENTATION_LANDSCAPE;
+        // Saat mendatar (game): "kecil" (bawaan) atau mati, agar tombol game tetap bisa disentuh.
+        boolean offInLand = Prefs.is(this, "noSwipeLand", false);
         View area = new View(this);
         area.setTag(getResources().getConfiguration().orientation);
         int width = getResources().getDisplayMetrics().widthPixels * 2 / 5;
         int id = getResources().getIdentifier("status_bar_height", "dimen", "android");
-        int height = Math.max(dp(32), id > 0 ? getResources().getDimensionPixelSize(id) : 0);
+        int height = id > 0 ? getResources().getDimensionPixelSize(id) : dp(28);
+        if (land) {
+            width = dp(56);
+            height = dp(10);
+        }
         WindowManager.LayoutParams lp = params(width, height,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                         | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
         lp.gravity = Gravity.TOP | (left ? Gravity.LEFT : Gravity.RIGHT);
+        if (land && offInLand) lp.flags |= WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE;
 
         final float[] start = new float[1];
         final boolean[] active = new boolean[1];
@@ -181,11 +189,25 @@ public class OverlayService extends AccessibilityService {
                 if (active[0]) drag(Math.min(1f, dy / dp(280)));
             } else if (a == MotionEvent.ACTION_UP || a == MotionEvent.ACTION_CANCEL) {
                 tracker[0].computeCurrentVelocity(1000);
-                boolean open = tracker[0].getYVelocity() > dp(400) || dy > dp(130);
-                if (tracker[0].getYVelocity() < -dp(400)) open = false;
+                float speed = tracker[0].getYVelocity();
                 tracker[0].recycle();
                 tracker[0] = null;
-                if (active[0]) { if (open) openFully(); else closePanel(); }
+                if (a == MotionEvent.ACTION_CANCEL && dy > dp(16)) {
+                    // Sistem merebut geseran untuk membuka panel bawaan: ambil alih kembali.
+                    if (!active[0]) addPanel(left);
+                    openFully();
+                    dismissNative();
+                    return true;
+                }
+                boolean open = speed > dp(400) || dy > dp(130);
+                if (speed < -dp(400)) open = false;
+                if (active[0]) {
+                    if (open) openFully(); else closePanel();
+                } else if (a == MotionEvent.ACTION_UP && dy > dp(40)) {
+                    // Geseran sangat cepat bisa tiba tanpa kejadian gerak sama sekali.
+                    addPanel(left);
+                    openFully();
+                }
             }
             return true;
         });
@@ -197,6 +219,7 @@ public class OverlayService extends AccessibilityService {
         removePanel();
         if (banner != null) removeBanner(banner);
         panel = notifications ? new Center(this, controls) : new Panel(this, controls);
+        android.util.Log.i("ControlCenter", "panel dibuka, pusat=" + notifications);
         panel.setBackground(new ColorDrawable(BACKGROUND));
         panelParams = params(-1, -1, WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
         // Efek blur kaca hanya didukung Android 12+ (dan tergantung perangkat).
@@ -207,6 +230,15 @@ public class OverlayService extends AccessibilityService {
         blur = 1;
         panel.setProgress(0);
         wm.addView(panel, panelParams);
+    }
+
+    /** Menutup panel notifikasi bawaan yang ikut terbuka (Android 12+). */
+    private void dismissNative() {
+        if (Build.VERSION.SDK_INT < 31 || handle == null) return;
+        Runnable dismiss = () -> performGlobalAction(GLOBAL_ACTION_DISMISS_NOTIFICATION_SHADE);
+        dismiss.run();
+        handle.postDelayed(dismiss, 120);
+        handle.postDelayed(dismiss, 400);
     }
 
     /** Izinkan keyboard muncul untuk kolom kata sandi. */
@@ -221,19 +253,26 @@ public class OverlayService extends AccessibilityService {
     }
 
     /** Tampilkan popup notifikasi bila keadaan layar memungkinkan. */
+    static boolean running() { return instance != null; }
+
     static boolean banner(StatusBarNotification note) {
         return instance != null && instance.showBanner(note);
     }
 
     private boolean showBanner(StatusBarNotification note) {
-        if (!Prefs.is(this, "popup", true) || panel != null) return false;
+        if (!Prefs.is(this, "popup", true)) return skip("popup dimatikan di pengaturan");
+        if (panel != null) return skip("panel sedang terbuka");
         if (!getSystemService(PowerManager.class).isInteractive()
-                || getSystemService(KeyguardManager.class).isKeyguardLocked()) return false;
-        if (Prefs.is(this, "hideFullscreen", true) && fullscreen()) return false;
+                || getSystemService(KeyguardManager.class).isKeyguardLocked()) {
+            return skip("layar mati atau terkunci");
+        }
+        if (Prefs.is(this, "hideFullscreen", true) && fullscreen()) {
+            return skip("layar mendatar (mode game)");
+        }
         // Jangan ganti popup yang sedang dipakai mengetik balasan.
         if (banner != null) {
             if ((bannerParams.flags & WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE) == 0) {
-                return false;
+                return skip("sedang mengetik balasan");
             }
             removeBanner(banner);
         }
@@ -243,20 +282,25 @@ public class OverlayService extends AccessibilityService {
         bannerParams.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
         int id = getResources().getIdentifier("status_bar_height", "dimen", "android");
         bannerParams.y = id > 0 ? getResources().getDimensionPixelSize(id) : dp(28);
-        wm.addView(next, bannerParams);
+        try { wm.addView(next, bannerParams); }
+        catch (RuntimeException e) { return skip("gagal menampilkan: " + e.getMessage()); }
         banner = next;
         next.enter();
+        Diag.popup(this, "tampil");
+        android.util.Log.i("ControlCenter", "popup tampil: " + note.getPackageName());
         return true;
     }
 
-    private boolean fullscreen() {
-        if (getResources().getConfiguration().orientation
-                == Configuration.ORIENTATION_LANDSCAPE) return true;
-        if (Build.VERSION.SDK_INT >= 30 && handle != null
-                && handle.getRootWindowInsets() != null) {
-            return !handle.getRootWindowInsets().isVisible(WindowInsets.Type.statusBars());
-        }
+    private boolean skip(String why) {
+        Diag.popup(this, "tidak tampil, " + why);
+        android.util.Log.i("ControlCenter", "popup tidak tampil: " + why);
         return false;
+    }
+
+    /** Mode game dikenali dari layar mendatar. */
+    private boolean fullscreen() {
+        return getResources().getConfiguration().orientation
+                == Configuration.ORIENTATION_LANDSCAPE;
     }
 
     void bannerKeyboard(Banner target) {
