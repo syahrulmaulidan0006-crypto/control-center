@@ -25,11 +25,29 @@ class PopupGlass extends Drawable {
     private final RectF box = new RectF();
     private final Path clip = new Path();
     private final float d;
-    private final int style;
+    private final int style, clear;
+
+    /** Kebeningan 0 (pekat) sampai 100 (hampir bening). 50 adalah bawaan tiap gaya. */
+    static final String CLEAR = "popupClear";
 
     PopupGlass(Context context, int style) {
+        this(context, style, clearness(context));
+    }
+
+    PopupGlass(Context context, int style, int clear) {
         d = context.getResources().getDisplayMetrics().density;
         this.style = style;
+        this.clear = clear;
+    }
+
+    static int clearness(Context c) { return Prefs.of(c).getInt(CLEAR, 50); }
+
+    /** Warna dasar dengan kepekatan sesuai pilihan kebeningan. */
+    private int base(int color) {
+        int usual = color >>> 24;
+        int alpha = clear <= 50 ? 240 + (usual - 240) * clear / 50
+                : usual + (8 - usual) * (clear - 50) / 50;
+        return Theme.alpha(color, alpha);
     }
 
     static int chosen(Context c) { return Prefs.of(c).getInt(KEY, LIQUID); }
@@ -44,7 +62,7 @@ class PopupGlass extends Drawable {
     /** Bening seperti tetesan air: bagian tengah tipis, tepi tebal dan memantulkan cahaya. */
     private void liquid(Canvas c) {
         float r = Math.min(34 * d, box.height() / 2);
-        fill(c, box, r, 0x6B0C1228);
+        fill(c, box, r, base(0x6B0C1228));
         gradient(c, box, r, false, new int[]{0x2EFFFFFF, 0x05FFFFFF, 0x00FFFFFF, 0x1FFFFFFF},
                 new float[]{0f, 0.35f, 0.7f, 1f});
 
@@ -68,7 +86,7 @@ class PopupGlass extends Drawable {
     /** Kaca es: pekat lembut, berbintik halus, dengan garis tepi rata. */
     private void frosted(Canvas c) {
         float r = Math.min(22 * d, box.height() / 2);
-        fill(c, box, r, 0xD1394264);
+        fill(c, box, r, base(0xD1394264));
         gradient(c, box, r, true, new int[]{0x38FFFFFF, 0x17FFFFFF, 0x0AFFFFFF, 0x14FFFFFF},
                 new float[]{0f, 0.35f, 0.75f, 1f});
         paint.setColor(0xFFFFFFFF);
@@ -78,7 +96,7 @@ class PopupGlass extends Drawable {
         stroke(c, r, 0.5f * d, d, new int[]{0x73FFFFFF, 0x59FFFFFF, 0x4DFFFFFF, 0x66FFFFFF});
     }
 
-    private static Bitmap grain() {
+    static Bitmap grain() {
         if (grain != null) return grain;
         Random random = new Random(7);
         int[] dots = new int[96 * 96];

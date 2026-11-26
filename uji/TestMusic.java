@@ -15,6 +15,11 @@ public class TestMusic extends BroadcastReceiver {
     private static MediaSession session;
 
     @Override public void onReceive(Context context, Intent intent) {
+        if (intent.hasExtra("bening")) {
+            context.getSharedPreferences("cc", Context.MODE_MULTI_PROCESS).edit()
+                    .putInt("popupClear", intent.getIntExtra("bening", 50)).commit();
+            return;
+        }
         if (intent.hasExtra("gaya")) {
             context.getSharedPreferences("cc", Context.MODE_MULTI_PROCESS).edit()
                     .putInt("popupStyle", intent.getIntExtra("gaya", 0)).commit();

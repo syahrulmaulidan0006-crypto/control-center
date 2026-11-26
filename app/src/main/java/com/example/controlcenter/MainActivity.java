@@ -23,6 +23,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
+import android.widget.SeekBar;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -75,6 +76,7 @@ public class MainActivity extends Activity {
     private void build() {
         if (root == null) return;
         root.removeAllViews();
+        Glass.load(this);
         title("Status layanan", 28);
         note("Titik hijau berarti siap. Merah perlu diperbaiki agar tetap berjalan.");
 
@@ -133,11 +135,15 @@ public class MainActivity extends Activity {
         title("Warna tombol", 20);
         colors();
 
+        title("Tampilan", 20);
+        popupStyles();
+        toggle("Getar halus saat disentuh", Haptic.KEY, true);
+        toggle("Animasi saat mengisi daya", "chargeAnim", true);
+
         title("Notifikasi", 20);
         note("Popup terakhir: " + Diag.read(this));
         button("Tes popup sekarang", this::test);
         toggle("Popup notifikasi", "popup", true);
-        popupStyles();
         toggle("Suara notifikasi", "sound", true);
         toggle("Getar saat ada notifikasi", "vibrate", true);
         note("Suara mengikuti volume dering dan diam saat HP dalam mode getar atau senyap. "
@@ -327,8 +333,9 @@ public class MainActivity extends Activity {
 
     /** Dua contoh popup di atas latar berwarna; ketuk untuk memilih. */
     private void popupStyles() {
-        note("Gaya popup");
+        note("Gaya kaca untuk popup, tombol, dan kartu");
         int chosen = PopupGlass.chosen(this);
+        View[] samples = new View[PopupGlass.NAMES.length];
         for (int i = 0; i < PopupGlass.NAMES.length; i++) {
             int index = i;
             LinearLayout frame = new LinearLayout(this);
@@ -343,6 +350,7 @@ public class MainActivity extends Activity {
             sample.setOrientation(LinearLayout.VERTICAL);
             sample.setPadding(dp(18), dp(14), dp(18), dp(14));
             sample.setBackground(new PopupGlass(this, i));
+            samples[i] = sample;
             TextView head = label("Rina", 15, Color.WHITE);
             head.setTypeface(Typeface.DEFAULT_BOLD);
             sample.addView(head);
@@ -353,7 +361,7 @@ public class MainActivity extends Activity {
             name.setTypeface(Typeface.DEFAULT_BOLD);
             name.setPadding(dp(4), dp(10), 0, 0);
             frame.addView(name);
-            frame.setContentDescription("Gaya popup " + PopupGlass.NAMES[i]);
+            frame.setContentDescription("Gaya kaca " + PopupGlass.NAMES[i]);
             frame.setOnClickListener(v -> {
                 Prefs.of(this).edit().putInt(PopupGlass.KEY, index).commit();
                 int y = scroll.getScrollY();
@@ -364,6 +372,39 @@ public class MainActivity extends Activity {
             p.topMargin = dp(8);
             root.addView(frame, p);
         }
+        clearness(samples);
+    }
+
+    /** Penggeser kebeningan popup; contoh di atasnya ikut berubah saat digeser. */
+    private void clearness(View[] samples) {
+        LinearLayout c = card();
+        c.setOrientation(LinearLayout.VERTICAL);
+        c.setGravity(Gravity.NO_GRAVITY);
+        int now = PopupGlass.clearness(this);
+        TextView name = label("Kebeningan popup: " + now + "%", 15, Color.WHITE);
+        c.addView(name);
+        SeekBar bar = new SeekBar(this);
+        bar.setMax(100);
+        bar.setProgress(now);
+        bar.setContentDescription("Kebeningan popup");
+        bar.setPadding(dp(8), dp(14), dp(8), dp(8));
+        bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar s, int value, boolean user) {
+                name.setText("Kebeningan popup: " + value + "%");
+                for (int i = 0; i < samples.length; i++) {
+                    samples[i].setBackground(new PopupGlass(MainActivity.this, i, value));
+                }
+            }
+            @Override public void onStartTrackingTouch(SeekBar s) { }
+            @Override public void onStopTrackingTouch(SeekBar s) {
+                Prefs.of(MainActivity.this).edit()
+                        .putInt(PopupGlass.CLEAR, s.getProgress()).commit();
+            }
+        });
+        c.addView(bar, new LinearLayout.LayoutParams(-1, -2));
+        TextView hint = label("0% pekat, 100% hampir bening. Makin bening, tulisan makin "
+                + "sulit dibaca di layar terang.", 13, MUTED);
+        c.addView(hint);
     }
 
     private TextView label(String value, int size, int color) {
