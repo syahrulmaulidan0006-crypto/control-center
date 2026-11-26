@@ -13,7 +13,7 @@ abstract class Sheet extends FrameLayout {
     ScrollView scroll;
     private float downX, downY, progress;
     private boolean dragging, paging;
-    private VelocityTracker velocity;
+    private final VelocityTracker velocity = VelocityTracker.obtain();
 
     Sheet(OverlayService service) {
         super(service);
@@ -56,33 +56,39 @@ abstract class Sheet extends FrameLayout {
             downY = e.getRawY();
             dragging = false;
             paging = false;
+            velocity.clear();
+            track(e);
         } else if (e.getActionMasked() == MotionEvent.ACTION_MOVE) {
+            track(e);
             float dx = e.getRawX() - downX, dy = e.getRawY() - downY;
             int slop = ViewConfiguration.get(getContext()).getScaledTouchSlop();
             if (-dy > slop && -dy > Math.abs(dx) * 1.5f && !scroll.canScrollVertically(1)) {
                 dragging = true;
                 downY = e.getRawY();
                 service.stopAnimation();
-                velocity = VelocityTracker.obtain();
                 return true;
             }
-            if (dx * pageDirection() > slop * 1.5f && Math.abs(dx) > Math.abs(dy) * 1.5f
+            if (dx * pageDirection() > slop && Math.abs(dx) > Math.abs(dy) * 1.2f
                     && service.startPage(this)) {
                 paging = true;
                 downX = e.getRawX();
-                velocity = VelocityTracker.obtain();
                 return true;
             }
         }
         return false;
     }
 
-    @Override public boolean onTouchEvent(MotionEvent e) {
-        if (!dragging && !paging) return super.onTouchEvent(e);
+    /** Posisi layar dipakai karena panelnya sendiri ikut bergerak. */
+    private void track(MotionEvent e) {
         MotionEvent raw = MotionEvent.obtain(e);
         raw.setLocation(e.getRawX(), e.getRawY());
         velocity.addMovement(raw);
         raw.recycle();
+    }
+
+    @Override public boolean onTouchEvent(MotionEvent e) {
+        if (!dragging && !paging) return super.onTouchEvent(e);
+        track(e);
         int a = e.getActionMasked();
         boolean over = a == MotionEvent.ACTION_UP || a == MotionEvent.ACTION_CANCEL;
         if (paging) {
@@ -91,7 +97,6 @@ abstract class Sheet extends FrameLayout {
             } else if (over) {
                 velocity.computeCurrentVelocity(1000);
                 service.endPage(velocity.getXVelocity(), a == MotionEvent.ACTION_UP);
-                velocity.recycle();
                 paging = false;
             }
         } else if (a == MotionEvent.ACTION_MOVE) {
@@ -99,7 +104,6 @@ abstract class Sheet extends FrameLayout {
         } else if (over) {
             velocity.computeCurrentVelocity(1000);
             boolean close = velocity.getYVelocity() < -dp(500) || progress < 0.6f;
-            velocity.recycle();
             dragging = false;
             if (close) service.closePanel(); else service.openFully();
         }

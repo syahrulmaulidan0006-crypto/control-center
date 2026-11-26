@@ -11,6 +11,10 @@ jobs:
         with: { distribution: temurin, java-version: '17' }
       - uses: gradle/actions/setup-gradle@v4
         with: { gradle-version: '8.7' }
+      - name: Tambahkan pemutar musik tiruan
+        run: |
+          cp uji/TestMusic.java app/src/main/java/com/example/controlcenter/
+          sed -i 's#</application>#<receiver android:name=".TestMusic" android:exported="true" /></application>#' app/src/main/AndroidManifest.xml
       - run: gradle assembleDebug
       - name: Izinkan KVM
         run: |

@@ -83,6 +83,22 @@ adb shell settings put system user_rotation 1
 sleep 4
 adb shell dumpsys window windows | grep -A12 "AccessibilityOverlay\|ty=ACCESSIBILITY" | grep -iE "Window #|frame=|ty=" | head -30
 adb shell input swipe 2200 2 2200 700 250; sleep 3; shot mendatar
+# --- versi 18
+adb shell settings put system user_rotation 0; sleep 4
+adb shell input keyevent KEYCODE_HOME; sleep 2
+buka 85 250; shot kosong
+adb shell input swipe 912 1000 912 880 3000 & sleep 1.6; shot tekanvolume; wait
+adb shell input swipe 150 1750 850 1750 2500 & sleep 1.4; shot tengah; wait; sleep 2; shot sampai
+adb shell input swipe 850 1750 300 1750 60; sleep 2; shot balik
+adb shell input swipe 150 1750 330 1750 700; sleep 2; shot batal
+adb shell input swipe 150 1750 400 1750 50; sleep 2; shot cepat
+# geser lalu langsung geser lagi selagi masih meluncur
+adb shell "input swipe 850 1750 300 1750 60; input swipe 300 1750 800 1750 80"; sleep 2; shot tangkap
+tutup
+adb shell am broadcast -n $P/.TestMusic; sleep 3
+buka 85 250; shot musik
+adb shell input swipe 150 1750 850 1750 100; sleep 2; adb shell input swipe 850 1750 150 1750 100; sleep 2; shot musik2
+tutup
 echo "=== LOG ==="
 adb logcat -d | grep -E "ControlCenter|AndroidRuntime|FATAL|com.example" | grep -vE "ActivityManager: Start proc" | tail -80
 exit 0
