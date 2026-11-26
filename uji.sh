@@ -87,7 +87,7 @@ adb shell input swipe 2200 2 2200 700 250; sleep 3; shot mendatar
 adb shell settings put system user_rotation 0; sleep 4
 adb shell input keyevent KEYCODE_HOME; sleep 2
 buka 85 250; shot kosong
-adb shell input swipe 912 1000 912 880 3000 & sleep 1.6; shot tekanvolume; wait
+adb shell input swipe 912 1040 912 860 1600 & sleep 1.1; shot tekanvolume; wait; sleep 2; shot lepasvolume
 adb shell input swipe 150 1750 850 1750 2500 & sleep 1.4; shot tengah; wait; sleep 2; shot sampai
 adb shell input swipe 850 1750 300 1750 60; sleep 2; shot balik
 adb shell input swipe 150 1750 330 1750 700; sleep 2; shot batal
