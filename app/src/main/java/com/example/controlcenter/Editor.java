@@ -195,15 +195,22 @@ class Editor extends FrameLayout {
                     break;
                 case MotionEvent.ACTION_UP:
                     v.removeCallbacks(hold);
-                    if (holding) drop(v, dx, dy);
-                    else if (!moved) {
+                    if (holding) {
+                        // Susunan diubah setelah sentuhan selesai diproses. Mengubahnya di
+                        // sini membuat aplikasi berhenti.
+                        holding = false;
+                        Editor.this.post(() -> drop(v, dx, dy));
+                    } else if (!moved) {
                         v.animate().scaleX(0.2f).scaleY(0.2f).alpha(0).setDuration(180)
                                 .withEndAction(() -> { order.remove(item); changed(); }).start();
                     }
                     break;
                 case MotionEvent.ACTION_CANCEL:
                     v.removeCallbacks(hold);
-                    if (holding) rebuild();
+                    if (holding) {
+                        holding = false;
+                        Editor.this.post(Editor.this::rebuild);
+                    }
                     break;
                 default:
                     break;
