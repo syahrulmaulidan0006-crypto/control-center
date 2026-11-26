@@ -6,8 +6,8 @@ android {
         applicationId 'com.example.controlcenter'
         minSdk 29
         targetSdk 34
-        versionCode 19
-        versionName '19.0'
+        versionCode 20
+        versionName '20.0'
     }
     buildFeatures { aidl true }
     compileOptions {

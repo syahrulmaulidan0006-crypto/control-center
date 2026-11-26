@@ -18,6 +18,7 @@ class Banner extends FrameLayout {
         this.note = note;
         setPadding(dp(10), dp(6), dp(10), dp(10));
         card = new NoteCard(service, note, 0x990E1430);
+        card.setBackground(new PopupGlass(service, PopupGlass.chosen(service)));
         card.setOnClickListener(v -> { Notes.open(service, note); leave(); });
         card.gestures(this::leave, this::expand, this::leave);
         addView(card, new LayoutParams(-1, -2));

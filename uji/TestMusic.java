@@ -15,6 +15,11 @@ public class TestMusic extends BroadcastReceiver {
     private static MediaSession session;
 
     @Override public void onReceive(Context context, Intent intent) {
+        if (intent.hasExtra("gaya")) {
+            context.getSharedPreferences("cc", Context.MODE_MULTI_PROCESS).edit()
+                    .putInt("popupStyle", intent.getIntExtra("gaya", 0)).commit();
+            return;
+        }
         Bitmap art = Bitmap.createBitmap(300, 300, Bitmap.Config.ARGB_8888);
         Canvas c = new Canvas(art);
         c.drawColor(0xFFB5651D);

@@ -137,6 +137,7 @@ public class MainActivity extends Activity {
         note("Popup terakhir: " + Diag.read(this));
         button("Tes popup sekarang", this::test);
         toggle("Popup notifikasi", "popup", true);
+        popupStyles();
         toggle("Suara notifikasi", "sound", true);
         toggle("Getar saat ada notifikasi", "vibrate", true);
         note("Suara mengikuti volume dering dan diam saat HP dalam mode getar atau senyap. "
@@ -321,6 +322,47 @@ public class MainActivity extends Activity {
             });
             row.addView(item, new LinearLayout.LayoutParams(
                     (getResources().getDisplayMetrics().widthPixels - dp(36)) / 4, -2));
+        }
+    }
+
+    /** Dua contoh popup di atas latar berwarna; ketuk untuk memilih. */
+    private void popupStyles() {
+        note("Gaya popup");
+        int chosen = PopupGlass.chosen(this);
+        for (int i = 0; i < PopupGlass.NAMES.length; i++) {
+            int index = i;
+            LinearLayout frame = new LinearLayout(this);
+            frame.setOrientation(LinearLayout.VERTICAL);
+            frame.setPadding(dp(14), dp(14), dp(14), dp(12));
+            GradientDrawable back = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                    new int[]{0xFF2F8CFF, 0xFF8B5CF6, 0xFFFF8A5B});
+            back.setCornerRadius(dp(22));
+            back.setStroke(dp(i == chosen ? 4 : 1), i == chosen ? 0xFF37D98A : 0x40FFFFFF);
+            frame.setBackground(back);
+            LinearLayout sample = new LinearLayout(this);
+            sample.setOrientation(LinearLayout.VERTICAL);
+            sample.setPadding(dp(18), dp(14), dp(18), dp(14));
+            sample.setBackground(new PopupGlass(this, i));
+            TextView head = label("Rina", 15, Color.WHITE);
+            head.setTypeface(Typeface.DEFAULT_BOLD);
+            sample.addView(head);
+            sample.addView(label("Sampai ketemu nanti sore", 14, Color.WHITE));
+            frame.addView(sample, new LinearLayout.LayoutParams(-1, -2));
+            TextView name = label((i == chosen ? "Dipakai: " : "") + PopupGlass.NAMES[i], 14,
+                    Color.WHITE);
+            name.setTypeface(Typeface.DEFAULT_BOLD);
+            name.setPadding(dp(4), dp(10), 0, 0);
+            frame.addView(name);
+            frame.setContentDescription("Gaya popup " + PopupGlass.NAMES[i]);
+            frame.setOnClickListener(v -> {
+                Prefs.of(this).edit().putInt(PopupGlass.KEY, index).commit();
+                int y = scroll.getScrollY();
+                build();
+                scroll.post(() -> scroll.scrollTo(0, y));
+            });
+            LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2);
+            p.topMargin = dp(8);
+            root.addView(frame, p);
         }
     }
 
