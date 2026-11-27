@@ -167,15 +167,18 @@ public class OverlayService extends AccessibilityService {
         if (volume != null && !volume.leaving()) return;
         if (volume != null) removeVolume(volume);
         Glass.load(this);
+        // Popup tembus langsung ke layar; jendela buramnya dibuat lebih dulu agar di bawah.
+        BlurPane pane = BlurPane.make(this, dp(27));
         VolumeHud next = new VolumeHud(this);
-        Frost.enable(next);
         try { wm.addView(next, VolumeHud.place(this)); }
-        catch (RuntimeException e) { return; }
+        catch (RuntimeException e) {
+            if (pane != null) pane.close();
+            return;
+        }
+        next.behind(pane);
         volume = next;
         android.util.Log.i("ControlCenter", "popup volume tampil");
-        // Masuk setelah layar dipotret, atau sebentar kemudian bila potretnya lambat.
-        Frost.capture(this, next::enter);
-        next.postDelayed(next::enter, 220);
+        next.post(next::enter);
     }
 
     void removeVolume(VolumeHud target) {
@@ -387,12 +390,15 @@ public class OverlayService extends AccessibilityService {
         return Build.VERSION.SDK_INT >= 30 && Prefs.is(this, "frost", true) && !Frost.failed();
     }
 
-    /** Gelapnya latar di sekeliling kaca. */
-    private int backdrop() {
-        // Dengan kaca bening asli, gelapnya disamakan dengan bagian dalam kaca.
-        int dim = frosting() ? Frost.dark(Glass.clear)
-                : Math.round(Color.alpha(BACKGROUND) * (1 - 0.75f * Glass.clear));
-        return Theme.alpha(BACKGROUND, dim);
+    /** Latar di sekeliling kaca. */
+    private android.graphics.drawable.Drawable backdrop() {
+        if (frosting()) {
+            // Mode buram: seluruh latar diburamkan. Mode bening: gelapnya disamakan saja.
+            return Glass.style == PopupGlass.FROSTED ? new Frost.Wall(Glass.clear)
+                    : new ColorDrawable(Theme.alpha(BACKGROUND, Frost.dark(Glass.clear)));
+        }
+        return new ColorDrawable(Theme.alpha(BACKGROUND,
+                Math.round(Color.alpha(BACKGROUND) * (1 - 0.75f * Glass.clear))));
     }
 
     /** Layar dipotret selagi belum tertutup jendela kita. */
@@ -421,7 +427,7 @@ public class OverlayService extends AccessibilityService {
         blur = 1;
         deck = new Deck(this, panel);
         Frost.enable(deck);
-        deck.setBackground(new ColorDrawable(backdrop()));
+        deck.setBackground(backdrop());
         panel.setProgress(0);
         deck.fade(0);
         wm.addView(deck, panelParams);
@@ -475,19 +481,23 @@ public class OverlayService extends AccessibilityService {
             banner.leave();
         }
         Glass.load(this);
+        BlurPane pane = BlurPane.make(this, dp(PopupGlass.chosen(this) == PopupGlass.FROSTED
+                ? 26 : 34));
         Banner next = new Banner(this, note);
-        Frost.enable(next);
         bannerParams = params(Math.min(getResources().getDisplayMetrics().widthPixels, dp(440)),
                 -2, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE);
         bannerParams.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
         int id = getResources().getIdentifier("status_bar_height", "dimen", "android");
         bannerParams.y = id > 0 ? getResources().getDimensionPixelSize(id) : dp(28);
         try { wm.addView(next, bannerParams); }
-        catch (RuntimeException e) { return skip("gagal menampilkan: " + e.getMessage()); }
+        catch (RuntimeException e) {
+            if (pane != null) pane.close();
+            return skip("gagal menampilkan: " + e.getMessage());
+        }
+        next.behind(pane);
         banner = next;
         islandRefresh();
-        Frost.capture(this, next::enter);
-        next.postDelayed(next::enter, 280);
+        next.post(next::enter);
         Diag.popup(this, "tampil");
         android.util.Log.i("ControlCenter", "popup tampil: " + note.getPackageName());
         return true;
@@ -524,10 +534,8 @@ public class OverlayService extends AccessibilityService {
         deck.fade(Math.max(0, Math.min(1, progress)));
         if (Build.VERSION.SDK_INT >= 31) {
             int target = Math.max(1, Math.round(
-                    // Luar kaca harus menyambung dengan isinya: liquid tetap tajam,
-                    // glassmorphism sedikit buram.
-                    (frosting() ? (Glass.style == PopupGlass.FROSTED ? dp(7) : 0)
-                            : dp(40) * (1 - 0.8f * Glass.clear))
+                    // Dengan kaca bening asli, buramnya kita gambar sendiri.
+                    (frosting() ? 0 : dp(40) * (1 - 0.8f * Glass.clear))
                             * Math.max(0, Math.min(1, progress))));
             if (Math.abs(target - blur) >= dp(3) || progress >= 1 || progress <= 0) {
                 blur = target;

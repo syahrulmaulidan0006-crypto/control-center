@@ -11,6 +11,7 @@ class Banner extends FrameLayout {
     private final NoteCard card;
     private boolean typing, leaving, entered;
     private final Runnable timeout = this::leave;
+    private BlurPane pane;
 
     Banner(OverlayService service, StatusBarNotification note) {
         super(service);
@@ -22,7 +23,7 @@ class Banner extends FrameLayout {
         card.setOnClickListener(v -> { Notes.open(service, note); leave(); });
         card.gestures(this::leave, this::expand, this::leave);
         addView(card, new LayoutParams(-1, -2));
-        // Disembunyikan sampai layar di belakangnya selesai dipotret.
+        // Disembunyikan sampai animasi masuk dimulai.
         card.setVisibility(INVISIBLE);
         card.actions(note, () -> {
             typing = true;
@@ -40,6 +41,18 @@ class Banner extends FrameLayout {
             android.view.ViewGroup group = (android.view.ViewGroup) v;
             for (int i = 0; i < group.getChildCount(); i++) shade(group.getChildAt(i));
         }
+    }
+
+    /** Jendela buram di belakang popup; boleh null. */
+    void behind(BlurPane under) {
+        pane = under;
+        if (pane != null) pane.follow(card);
+    }
+
+    @Override protected void onDetachedFromWindow() {
+        if (pane != null) pane.close();
+        pane = null;
+        super.onDetachedFromWindow();
     }
 
     void enter() {

@@ -43,6 +43,9 @@ class Glass extends Drawable {
     /** Gaya yang sedang dipakai; diperbarui setiap panel, popup, atau jendela dibuat. */
     static int style = PopupGlass.LIQUID;
 
+    /** Benar selagi menggambar benda yang garis tepinya harus redup. */
+    static boolean quiet;
+
     /** Kebeningan 0 (pekat) sampai 1 (sebening kaca). */
     static float clear = 0.8f;
 
@@ -105,9 +108,9 @@ class Glass extends Drawable {
         }
         paint.setStyle(Paint.Style.STROKE);
         paint.setColor(0xFFFFFFFF);
-        if (style == PopupGlass.FROSTED) {
+        if (quiet || style == PopupGlass.FROSTED) {
             paint.setShader(null);
-            paint.setColor(0x4DFFFFFF);
+            paint.setColor(quiet ? 0x30FFFFFF : 0x4DFFFFFF);
         } else {
             paint.setShader(new LinearGradient(r.left, r.top, r.right, r.bottom,
                     new int[]{0xB3FFFFFF, 0x26FFFFFF, 0x1FFFFFFF, 0x73FFFFFF},
