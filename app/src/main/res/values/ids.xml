@@ -1,4 +1,6 @@
 <resources>
     <!-- Penanda kunci notifikasi teratas pada baris pusat notifikasi. -->
     <item name="front" type="id" />
+    <!-- Penanda jendela yang memakai kaca buram asli. -->
+    <item name="frost" type="id" />
 </resources>

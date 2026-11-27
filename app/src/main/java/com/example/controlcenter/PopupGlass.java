@@ -54,7 +54,21 @@ class PopupGlass extends Drawable {
 
     @Override public void draw(Canvas c) {
         box.set(getBounds());
-        if (style == FROSTED) frosted(c); else liquid(c);
+        Callback host = getCallback();
+        if (host instanceof android.view.View) Frost.begin((android.view.View) host);
+        if (Frost.active()) {
+            float r = Math.min((style == FROSTED ? 22 : 34) * d, box.height() / 2);
+            Frost.draw(c, box, r, d, clear / 100f);
+            // Popup berisi tulisan, jadi diberi selaput agar tetap terbaca.
+            fill(c, box, r, Theme.alpha(0xFF0C1228, Math.round(150 - 120 * clear / 100f)));
+            if (style == FROSTED) fill(c, box, r, 0x1FDCE4FF);
+            Frost.rim(c, box, r, d);
+            Frost.end();
+        } else if (style == FROSTED) {
+            frosted(c);
+        } else {
+            liquid(c);
+        }
         paint.setShader(null);
         paint.setStyle(Paint.Style.FILL);
     }

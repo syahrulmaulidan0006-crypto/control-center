@@ -33,6 +33,7 @@ class Stack extends FrameLayout {
         RectF above = new RectF(front.getLeft(), front.getTop(),
                 front.getRight(), front.getBottom());
         c.save();
+        Frost.begin(this);
         for (int i = 1; i <= depth; i++) {
             // Bagian yang tertutup lapisan di atasnya tidak digambar, agar kaca tidak keruh.
             Path covered = new Path();
@@ -45,6 +46,7 @@ class Stack extends FrameLayout {
             Glass.draw(c, paint, layer, radius, d, i == 1 ? 0x24FFFFFF : 0x12FFFFFF);
             above = layer;
         }
+        Frost.end();
         c.restore();
     }
 }

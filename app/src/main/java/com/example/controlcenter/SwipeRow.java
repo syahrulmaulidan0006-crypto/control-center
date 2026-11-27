@@ -57,7 +57,9 @@ class SwipeRow extends FrameLayout {
         RectF area = new RectF(0, 0, wide, height);
         c.saveLayerAlpha(area, Math.round(255 * seen));
         float radius = Math.min(28 * d, Math.min(wide, height) / 2);
+        Frost.begin(this);
         Glass.draw(c, paint, area, radius, d, armed ? 0xD9FF453A : 0x80FF453A);
+        Frost.end();
         float half = 12 * d * (0.6f + 0.4f * Math.min(1, wide / (70 * d))) * (1 + 0.22f * pop);
         float cx = wide / 2, cy = height / 2;
         icon.setBounds(Math.round(cx - half), Math.round(cy - half),

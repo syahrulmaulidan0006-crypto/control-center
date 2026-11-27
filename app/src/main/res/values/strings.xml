@@ -1,4 +1,4 @@
 <resources>
     <string name="app_name">Control Center</string>
-    <string name="service_info">Menampilkan Control Center dan pusat notifikasi saat status bar digeser. Tidak membaca isi layar.</string>
+    <string name="service_info">Menampilkan Control Center dan pusat notifikasi saat status bar digeser. Mengambil potret layar sesaat hanya untuk efek kaca buram (tidak disimpan atau dikirim), dan membaca tombol volume untuk popup volume. Tidak membaca teks di layar.</string>
 </resources>
