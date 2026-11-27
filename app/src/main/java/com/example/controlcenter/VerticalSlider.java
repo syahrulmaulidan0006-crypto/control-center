@@ -27,6 +27,9 @@ class VerticalSlider extends View {
     private boolean active;
     private final int covered;
     private float startY, startValue;
+    /** Isian cairan untuk volume dan kecerahan; null berarti isian putih biasa. */
+    private final Liquid liquid;
+    private final Liquid.Wave wave = new Liquid.Wave();
     /** Kepekatan angka persen. */
     private float label;
     private android.animation.ValueAnimator labelFade;
@@ -52,6 +55,10 @@ class VerticalSlider extends View {
         this.listener = listener;
         this.allowed = allowed;
         this.covered = Theme.onWhite(context);
+        boolean wet = Prefs.is(context, "liquid", true);
+        // Objek sendiri tiap slider agar kuas dan jalurnya tidak dipakai bersama.
+        this.liquid = !wet ? null : iconRes == R.drawable.ic_volume ? Liquid.blue()
+                : iconRes == R.drawable.ic_sun ? Liquid.amber() : null;
     }
 
     /** Ikon berbeda untuk nilai nol dan rendah. */
@@ -73,7 +80,12 @@ class VerticalSlider extends View {
         target = next;
         animator = android.animation.ValueAnimator.ofFloat(value, next);
         animator.setDuration(160);
-        animator.addUpdateListener(a -> { value = (float) a.getAnimatedValue(); invalidate(); });
+        animator.addUpdateListener(a -> {
+            float now = (float) a.getAnimatedValue();
+            wave.stir(now - value);
+            value = now;
+            invalidate();
+        });
         animator.start();
     }
 
@@ -99,30 +111,46 @@ class VerticalSlider extends View {
         c.save();
         c.clipPath(clip);
         float d = getResources().getDisplayMetrics().density;
+        Frost.begin(this);
         Glass.draw(c, paint, new RectF(0, 0, w, h), r, d, 0x1FFFFFFF);
-        paint.setColor(0xEBFFFFFF);
-        c.drawRect(0, h * (1 - value), w, h, paint);
+        boolean moving = false;
+        if (liquid != null) {
+            moving = liquid.draw(c, wave, w, h, value, d);
+        } else {
+            paint.setShader(null);
+            paint.setColor(0xEBFFFFFF);
+            c.drawRect(0, h * (1 - value), w, h, paint);
+        }
         c.restore();
         Glass.shine(c, paint, new RectF(0, 0, w, h), r, d);
+        Frost.end();
+        if (moving) postInvalidateOnAnimation();
 
         int size = Math.round(w * 0.46f);
         int left = Math.round((w - size) / 2);
         int top = Math.round(h - size - w * 0.28f);
         icon.setBounds(left, top, left + size, top + size);
         // Ikon menjadi gelap bila tertutup isian terang.
-        icon.setTint(h * (1 - value) < top + size / 2f ? covered : 0xFFFFFFFF);
+        icon.setTint(liquid == null && h * (1 - value) < top + size / 2f
+                ? covered : 0xFFFFFFFF);
         icon.draw(c);
         if (label > 0) {
             float y = w * 0.66f;
-            paint.setColor(h * (1 - value) < y - 5 * d ? covered : 0xFFFFFFFF);
+            paint.setColor(liquid == null && h * (1 - value) < y - 5 * d
+                    ? covered : 0xFFFFFFFF);
+            if (liquid != null) paint.setShadowLayer(4 * d, 0, d, 0x99000000);
             paint.setAlpha(Math.round(paint.getAlpha() * label));
             paint.setTextAlign(Paint.Align.CENTER);
             paint.setTextSize(Math.min(w * 0.25f, 17 * d));
             paint.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
             c.drawText(Math.round(value * 100) + "%", r, y, paint);
             paint.setTypeface(android.graphics.Typeface.DEFAULT);
+            paint.clearShadowLayer();
         }
     }
+
+    /** Nilai sekarang, 0 sampai 1. */
+    float value() { return value; }
 
     @Override public boolean onTouchEvent(MotionEvent e) {
         int a = e.getActionMasked();
@@ -156,6 +184,7 @@ class VerticalSlider extends View {
             value = Math.max(0f, Math.min(1f, next));
             // Terasa saat mentok di bawah atau di atas.
             if (value != before && (value == 0 || value == 1)) Haptic.tick(getContext());
+            wave.stir(value - before);
             listener.onChange(value);
             invalidate();
         }

@@ -147,6 +147,7 @@ class TileView extends View {
         float w = getWidth(), h = getHeight();
         float d = getResources().getDisplayMetrics().density;
         float cx = w / 2, cy = h / 2, r = Math.min(cx, cy) - d;
+        Frost.begin(this);
         // Bentuk dikenali dari ukurannya: persegi, lebar, atau besar.
         boolean wide = w > h * 1.5f;
         if (wide) {
@@ -165,6 +166,7 @@ class TileView extends View {
             c.drawCircle(cx, cy, r * fill, paint);
             Glass.shine(c, paint, circle, r, d);
         }
+        Frost.end();
         if (wide) {
             float x = h + 2 * d;
             words(c, x, h / 2, w - x - 12 * d, Layout.Alignment.ALIGN_NORMAL);

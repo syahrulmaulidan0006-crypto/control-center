@@ -40,7 +40,8 @@ import android.widget.TextView;
 /** Kapsul melayang di atas layar untuk hitung mundur, lagu, dan pengisian daya. */
 class Island {
     static final String ON = "island", TOP = "islandY", TIMER_END = "timerEnd";
-    private static final int NONE = 0, TIMER = 1, MUSIC = 2, CHARGE = 3;
+    private static final int NONE = 0, TIMER = 1, MUSIC = 2, CHARGE = 3, RECORD = 4;
+    private static final int RED = 0xFFFF453A;
     private static final int BLACK = 0xF2080A10, GREEN = 0xFF37D98A, AMBER = 0xFFFFB43C;
 
     private final OverlayService service;
@@ -101,9 +102,11 @@ class Island {
     }
 
     private boolean allowed() {
-        return Prefs.is(service, ON, true) && !service.busy()
-                && service.getResources().getConfiguration().orientation
-                        == Configuration.ORIENTATION_PORTRAIT
+        // Saat merekam, kapsul selalu tersedia sebagai tombol berhenti.
+        boolean recording = RecordService.since > 0;
+        return (recording || Prefs.is(service, ON, true)) && !service.busy()
+                && (recording || service.getResources().getConfiguration().orientation
+                        == Configuration.ORIENTATION_PORTRAIT)
                 && service.getSystemService(PowerManager.class).isInteractive()
                 && !service.getSystemService(KeyguardManager.class).isKeyguardLocked();
     }
@@ -124,7 +127,7 @@ class Island {
         timerEnd = end > now ? end : 0;
         // Lagu yang dijeda tetap tampil selagi kapsulnya sedang dibuka.
         boolean music = player != null && (playing || expanded && kind == MUSIC);
-        int next = timerEnd > 0 ? TIMER : music ? MUSIC
+        int next = RecordService.since > 0 ? RECORD : timerEnd > 0 ? TIMER : music ? MUSIC
                 : SystemClock.elapsedRealtime() < chargeUntil ? CHARGE : NONE;
         if (next == CHARGE) {
             Intent battery = service.registerReceiver(null,
@@ -210,6 +213,11 @@ class Island {
         window.swap();
     }
 
+    private static String recorded() {
+        long s = Math.max(0, (SystemClock.elapsedRealtime() - RecordService.since) / 1000);
+        return String.format("%d:%02d", s / 60, s % 60);
+    }
+
     private static String clock(long millis) {
         long s = Math.max(0, (millis + 999) / 1000);
         return s >= 3600 ? String.format("%d:%02d:%02d", s / 3600, s / 60 % 60, s % 60)
@@ -241,7 +249,10 @@ class Island {
                                 .widthPixels - dp(20), dp(380)), -2)
                         : new LayoutParams(dp(112), dp(30)));
             }
-            if (time != null) time.setText(clock(timerEnd - System.currentTimeMillis()));
+            if (time != null) {
+                time.setText(kind == RECORD ? recorded()
+                        : clock(timerEnd - System.currentTimeMillis()));
+            }
             if (toggle != null) {
                 toggle.setImageResource(playing ? R.drawable.ic_pause : R.drawable.ic_play);
             }
@@ -284,6 +295,7 @@ class Island {
             card.setOnClickListener(v -> expand(false));
             if (kind == MUSIC) music(card);
             else if (kind == TIMER) timer(card);
+            else if (kind == RECORD) recording(card);
             else charge(card);
             return card;
         }
@@ -372,6 +384,27 @@ class Island {
                 // Hanya menyembunyikan kapsul; pengatur waktunya ada di aplikasi Jam.
                 Prefs.of(service).edit().remove(TIMER_END).apply();
                 MusicListener.hideCountdown();
+                expanded = false;
+                refresh();
+            });
+            card.addView(buttons);
+        }
+
+        private void recording(LinearLayout card) {
+            LinearLayout head = row();
+            head.addView(icon(R.drawable.ic_record, RED), new LinearLayout.LayoutParams(
+                    dp(40), dp(40)));
+            TextView name = line("Merekam layar", 15, 0xB3FFFFFF, false);
+            name.setPadding(dp(12), 0, 0, 0);
+            head.addView(name, new LinearLayout.LayoutParams(0, -2, 1));
+            time = line(recorded(), 32, RED, false);
+            head.addView(time);
+            card.addView(head);
+            LinearLayout buttons = row();
+            buttons.setPadding(0, dp(12), 0, 0);
+            pill(buttons, "Berhenti", () -> {
+                Haptic.click(service);
+                RecordService.stop();
                 expanded = false;
                 refresh();
             });
@@ -475,6 +508,14 @@ class Island {
                     c.drawRoundRect(x, cy - half, x + 3 * d, cy + half, 2 * d, 2 * d, paint);
                 }
                 if (playing) postInvalidateDelayed(90);
+            } else if (kind == RECORD) {
+                // Titik merah berdenyut dan lama rekaman.
+                float pulse = 0.75f + 0.25f
+                        * (float) Math.sin(SystemClock.uptimeMillis() / 260.0);
+                paint.setColor(RED);
+                c.drawCircle(left, cy, r * 0.55f * pulse, paint);
+                c.drawText(recorded(), right, cy - (paint.ascent() + paint.descent()) / 2, paint);
+                postInvalidateDelayed(60);
             } else {
                 boolean timer = kind == TIMER;
                 int color = timer ? AMBER : GREEN;

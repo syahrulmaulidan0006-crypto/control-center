@@ -64,6 +64,7 @@ class Controls {
     boolean isOn(Item item) {
         try {
             switch (item) {
+                case RECORD: return RecordService.since > 0;
                 case AIRPLANE: return global(Settings.Global.AIRPLANE_MODE_ON) == 1;
                 case WIFI: return service.getApplicationContext()
                         .getSystemService(WifiManager.class).isWifiEnabled();
@@ -136,7 +137,10 @@ class Controls {
                     Intent.ACTION_MAIN, Intent.CATEGORY_APP_CALCULATOR)); break;
             case CAMERA: launch(new Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)); break;
             case ALARM: launch(new Intent(AlarmClock.ACTION_SHOW_ALARMS)); break;
-            case RECORD: app("com.miui.screenrecorder"); break;
+            case RECORD:
+                if (RecordService.active()) RecordService.stop();
+                else service.pickRecord();
+                break;
             case QR: app("com.xiaomi.scanner", "com.google.ar.lens"); break;
             case BATTERY: launch(new Intent(Settings.ACTION_BATTERY_SAVER_SETTINGS)); break;
             case SETTINGS: launch(new Intent(Settings.ACTION_SETTINGS)); break;
@@ -228,6 +232,12 @@ class Controls {
             if (i != null) { launch(i); return; }
         }
         toast("Aplikasi tidak ditemukan di HP ini");
+    }
+
+    /** Menutup panel, lalu menjalankan sesuatu setelah panelnya hilang. */
+    void closeFor(Runnable next) {
+        service.closePanel();
+        handler.postDelayed(next, 300);
     }
 
     void launch(Intent... choices) {

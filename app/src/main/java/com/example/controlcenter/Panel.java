@@ -485,6 +485,13 @@ class Panel extends Sheet {
 
     // ---------------------------------------------------------------- Jendela mengambang
 
+    /** Pilihan suara perekam, muncul dari tombolnya. */
+    void showRecord() {
+        View origin = shortcuts;
+        for (TileView t : custom) if (t.item == Item.RECORD) origin = t;
+        showPicker(Item.RECORD, origin);
+    }
+
     private void showPicker(Item item, View origin) {
         if (popup != null || editor != null) return;
         show(new Picker(getContext(), controls, item, Math.min(width, dp(400)),

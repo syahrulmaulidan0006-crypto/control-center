@@ -171,8 +171,34 @@ class Picker extends FrameLayout {
             case TIMER: case ALARM: timer(); break;
             case AUTO_LIGHT: light(); break;
             case VOLUME: case VIBRATE: case MUTE: volume(); break;
+            case RECORD: record(); break;
             default: plain();
         }
+    }
+
+    private void record() {
+        if (RecordService.active()) {
+            row(R.drawable.ic_record, "Berhenti merekam", "Video disimpan ke galeri", true,
+                    () -> {
+                        RecordService.stop();
+                        close.run();
+                    });
+            return;
+        }
+        sound(R.drawable.ic_record, "Tanpa suara", "Hanya gambar layar", Recorder.SILENT);
+        sound(R.drawable.ic_mic, "Dengan mikrofon", "Suara Anda dan sekitar",
+                Recorder.MICROPHONE);
+        sound(R.drawable.ic_volume, "Dengan suara HP", "Musik dan game, bila diizinkan",
+                Recorder.DEVICE);
+    }
+
+    private void sound(int icon, String label, String detail, int value) {
+        boolean last = Prefs.of(getContext()).getInt("recordSound", Recorder.MICROPHONE) == value;
+        row(icon, label, detail, last, () -> {
+            Prefs.of(getContext()).edit().putInt("recordSound", value).commit();
+            Context app = getContext().getApplicationContext();
+            controls.closeFor(() -> RecordActivity.open(app, value));
+        });
     }
 
     private void refreshSoon() { postDelayed(this::render, 350); }

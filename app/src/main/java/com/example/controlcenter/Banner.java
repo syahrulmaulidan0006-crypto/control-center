@@ -9,7 +9,7 @@ class Banner extends FrameLayout {
     private final OverlayService service;
     private final StatusBarNotification note;
     private final NoteCard card;
-    private boolean typing, leaving;
+    private boolean typing, leaving, entered;
     private final Runnable timeout = this::leave;
 
     Banner(OverlayService service, StatusBarNotification note) {
@@ -22,6 +22,8 @@ class Banner extends FrameLayout {
         card.setOnClickListener(v -> { Notes.open(service, note); leave(); });
         card.gestures(this::leave, this::expand, this::leave);
         addView(card, new LayoutParams(-1, -2));
+        // Disembunyikan sampai layar di belakangnya selesai dipotret.
+        card.setVisibility(INVISIBLE);
         card.actions(note, () -> {
             typing = true;
             removeCallbacks(timeout);
@@ -41,6 +43,9 @@ class Banner extends FrameLayout {
     }
 
     void enter() {
+        if (entered || leaving) return;
+        entered = true;
+        card.setVisibility(VISIBLE);
         card.setTranslationY(-dp(160));
         card.setScaleX(0.82f);
         card.setScaleY(0.82f);

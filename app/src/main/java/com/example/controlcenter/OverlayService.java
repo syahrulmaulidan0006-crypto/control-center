@@ -18,6 +18,8 @@ import android.service.notification.StatusBarNotification;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.ColorDrawable;
+import android.media.AudioManager;
+import android.view.KeyEvent;
 import android.os.Build;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -107,6 +109,90 @@ public class OverlayService extends AccessibilityService {
         charging = null;
     }
 
+    private VolumeHud volume;
+    private int heldKey;
+    private int repeats;
+    private final android.os.Handler keys =
+            new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable repeat = new Runnable() {
+        @Override public void run() {
+            // Dibatasi agar tidak terus berjalan bila tanda tombol dilepas tidak sampai.
+            if (heldKey == 0 || repeats++ > 60) return;
+            step(heldKey);
+            keys.postDelayed(this, 90);
+        }
+    };
+
+    /** Tombol volume di luar panel memakai popup cairan, bukan popup bawaan. */
+    @Override protected boolean onKeyEvent(KeyEvent e) {
+        int code = e.getKeyCode();
+        if (code != KeyEvent.KEYCODE_VOLUME_UP && code != KeyEvent.KEYCODE_VOLUME_DOWN) {
+            return false;
+        }
+        if (e.getAction() == KeyEvent.ACTION_UP) {
+            // Hanya tombol yang tekanannya kita ambil yang pelepasannya ditahan.
+            if (heldKey != code) return false;
+            heldKey = 0;
+            keys.removeCallbacks(repeat);
+            return true;
+        }
+        if (heldKey == code) return true;
+        AudioManager audio = getSystemService(AudioManager.class);
+        // Panggilan, dering, layar mati, dan layar kunci dibiarkan ditangani sistem.
+        if (!Prefs.is(this, "volumeHud", true) || panel != null || controls == null
+                || audio.getMode() != AudioManager.MODE_NORMAL
+                || !getSystemService(PowerManager.class).isInteractive()
+                || getSystemService(KeyguardManager.class).isKeyguardLocked()) {
+            return false;
+        }
+        heldKey = code;
+        repeats = 0;
+        keys.removeCallbacks(repeat);
+        keys.postDelayed(repeat, 420);
+        showVolume();
+        step(code);
+        return true;
+    }
+
+    private void step(int code) {
+        try {
+            getSystemService(AudioManager.class).adjustStreamVolume(AudioManager.STREAM_MUSIC,
+                    code == KeyEvent.KEYCODE_VOLUME_UP ? AudioManager.ADJUST_RAISE
+                            : AudioManager.ADJUST_LOWER, 0);
+        } catch (SecurityException ignored) { }
+        if (volume != null) volume.update();
+    }
+
+    private void showVolume() {
+        if (volume != null && !volume.leaving()) return;
+        if (volume != null) removeVolume(volume);
+        Glass.load(this);
+        VolumeHud next = new VolumeHud(this);
+        Frost.enable(next);
+        try { wm.addView(next, VolumeHud.place(this)); }
+        catch (RuntimeException e) { return; }
+        volume = next;
+        android.util.Log.i("ControlCenter", "popup volume tampil");
+        // Masuk setelah layar dipotret, atau sebentar kemudian bila potretnya lambat.
+        Frost.capture(this, next::enter);
+        next.postDelayed(next::enter, 220);
+    }
+
+    void removeVolume(VolumeHud target) {
+        if (target.isAttachedToWindow()) wm.removeViewImmediate(target);
+        if (volume == target) volume = null;
+    }
+
+    /** Membuka pilihan suara untuk merekam layar. */
+    void pickRecord() {
+        if (panel instanceof Panel) ((Panel) panel).showRecord();
+    }
+
+    /** Dipanggil perekam saat mulai dan selesai. */
+    static void recordingChanged() {
+        if (instance != null) instance.islandRefresh();
+    }
+
     @Override public void onAccessibilityEvent(AccessibilityEvent event) { }
 
     @Override public void onInterrupt() { }
@@ -180,6 +266,8 @@ public class OverlayService extends AccessibilityService {
         island = null;
         removePanel();
         removeCharging();
+        keys.removeCallbacks(repeat);
+        if (volume != null) removeVolume(volume);
         if (banner != null) removeBanner(banner);
         removeHandles();
         if (controls != null) controls.release();
@@ -253,6 +341,7 @@ public class OverlayService extends AccessibilityService {
                 start[0] = e.getRawY();
                 active[0] = false;
                 tracker[0] = VelocityTracker.obtain();
+                snapshot();
             }
             if (tracker[0] == null) return true;
             MotionEvent raw = MotionEvent.obtain(e);
@@ -294,8 +383,19 @@ public class OverlayService extends AccessibilityService {
         return area;
     }
 
+    private boolean frosting() {
+        return Build.VERSION.SDK_INT >= 30 && Prefs.is(this, "frost", true) && Frost.ready();
+    }
+
+    /** Layar dipotret selagi belum tertutup jendela kita. */
+    private void snapshot() {
+        if (panel != null) return;
+        Frost.capture(this, () -> { if (deck != null) deck.invalidate(); });
+    }
+
     private void addPanel(boolean notifications) {
         removePanel();
+        if (volume != null) removeVolume(volume);
         if (banner != null) banner.leave();
         Glass.load(this);
         panel = notifications ? new Center(this, controls) : new Panel(this, controls);
@@ -308,7 +408,10 @@ public class OverlayService extends AccessibilityService {
         }
         blur = 1;
         deck = new Deck(this, panel);
-        int dim = Math.round(Color.alpha(BACKGROUND) * (1 - 0.75f * Glass.clear));
+        Frost.enable(deck);
+        // Dengan kaca buram asli, latar dibiarkan hampir utuh seperti dilihat lewat kaca.
+        int dim = Math.round(Color.alpha(BACKGROUND)
+                * (frosting() ? 0.55f - 0.4f * Glass.clear : 1 - 0.75f * Glass.clear));
         deck.setBackground(new ColorDrawable(Theme.alpha(BACKGROUND, dim)));
         panel.setProgress(0);
         deck.fade(0);
@@ -364,6 +467,7 @@ public class OverlayService extends AccessibilityService {
         }
         Glass.load(this);
         Banner next = new Banner(this, note);
+        Frost.enable(next);
         bannerParams = params(Math.min(getResources().getDisplayMetrics().widthPixels, dp(440)),
                 -2, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE);
         bannerParams.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
@@ -373,7 +477,8 @@ public class OverlayService extends AccessibilityService {
         catch (RuntimeException e) { return skip("gagal menampilkan: " + e.getMessage()); }
         banner = next;
         islandRefresh();
-        next.enter();
+        Frost.capture(this, next::enter);
+        next.postDelayed(next::enter, 280);
         Diag.popup(this, "tampil");
         android.util.Log.i("ControlCenter", "popup tampil: " + note.getPackageName());
         return true;
@@ -410,7 +515,8 @@ public class OverlayService extends AccessibilityService {
         deck.fade(Math.max(0, Math.min(1, progress)));
         if (Build.VERSION.SDK_INT >= 31) {
             int target = Math.max(1, Math.round(
-                    dp(40) * (1 - 0.8f * Glass.clear) * Math.max(0, Math.min(1, progress))));
+                    dp(40) * (frosting() ? Math.max(0, 0.9f - Glass.clear) * 0.8f
+                            : 1 - 0.8f * Glass.clear) * Math.max(0, Math.min(1, progress))));
             if (Math.abs(target - blur) >= dp(3) || progress >= 1 || progress <= 0) {
                 blur = target;
                 panelParams.setBlurBehindRadius(blur);

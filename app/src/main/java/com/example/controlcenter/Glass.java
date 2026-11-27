@@ -26,8 +26,11 @@ class Glass extends Drawable {
 
     @Override public void draw(Canvas c) {
         box.set(getBounds());
+        Callback host = getCallback();
+        if (host instanceof android.view.View) Frost.begin((android.view.View) host);
         draw(c, paint, box, Math.min(radius, Math.min(box.width(), box.height()) / 2),
                 density, tint);
+        Frost.end();
     }
 
     /** Gaya yang sedang dipakai; diperbarui setiap panel, popup, atau jendela dibuat. */
@@ -57,6 +60,23 @@ class Glass extends Drawable {
         boolean frosted = style == PopupGlass.FROSTED;
         paint.setStyle(Paint.Style.FILL);
         paint.setShader(null);
+        if (Frost.active()) {
+            Frost.draw(c, r, radius, density, clear);
+            // Warna khas benda (tombol aktif, tombol hapus) tetap di atas kacanya.
+            paint.setColor(thin(tint, 0.82f));
+            c.drawRoundRect(r, radius, radius, paint);
+            if (frosted) {
+                paint.setColor(0x1FDCE4FF);
+                c.drawRoundRect(r, radius, radius, paint);
+                paint.setColor(0xFFFFFFFF);
+                paint.setShader(new BitmapShader(PopupGlass.grain(), Shader.TileMode.REPEAT,
+                        Shader.TileMode.REPEAT));
+                c.drawRoundRect(r, radius, radius, paint);
+                paint.setShader(null);
+            }
+            Frost.rim(c, r, radius, density);
+            return;
+        }
         paint.setColor(thin(tint, 0.82f));
         c.drawRoundRect(r, radius, radius, paint);
         if (frosted) {
@@ -80,6 +100,10 @@ class Glass extends Drawable {
 
     /** Pantulan di tepi kaca. */
     static void shine(Canvas c, Paint paint, RectF r, float radius, float density) {
+        if (Frost.active()) {
+            Frost.rim(c, r, radius, density);
+            return;
+        }
         paint.setStyle(Paint.Style.STROKE);
         paint.setColor(0xFFFFFFFF);
         if (style == PopupGlass.FROSTED) {

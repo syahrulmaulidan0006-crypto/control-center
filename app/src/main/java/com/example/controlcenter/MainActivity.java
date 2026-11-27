@@ -229,6 +229,14 @@ public class MainActivity extends Activity {
         colors();
         title("Gaya kaca", 18);
         popupStyles();
+        title("Kaca dan cairan", 18);
+        toggle("Kaca buram asli (Android 11 ke atas)", "frost", true);
+        note("Layar dipotret sesaat saat panel atau popup muncul, hanya untuk latar kaca. "
+                + "Tidak disimpan atau dikirim.");
+        toggle("Isian cairan pada volume dan kecerahan", "liquid", true);
+        toggle("Popup volume cairan saat tombol volume ditekan", "volumeHud", true);
+        note("Mengatur volume media. Saat panggilan dan di layar kunci tetap memakai bawaan. "
+                + "Matikan bila tombol volume ingin dipakai memotret.");
         title("Gerak dan sentuhan", 18);
         toggle("Getar halus saat disentuh", Haptic.KEY, true);
         toggle("Animasi saat mengisi daya", "chargeAnim", true);
