@@ -14,6 +14,7 @@ import android.content.pm.ServiceInfo;
 import android.content.res.Configuration;
 import android.app.KeyguardManager;
 import android.os.PowerManager;
+import android.os.SystemClock;
 import android.service.notification.StatusBarNotification;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
@@ -63,6 +64,12 @@ public class OverlayService extends AccessibilityService {
         @Override public void onReceive(Context c, Intent i) {
             Focus.check(OverlayService.this, controls);
             islandRefresh();
+            // Dicolok saat layar mati: tampilkan begitu layarnya menyala.
+            if (Intent.ACTION_SCREEN_ON.equals(i.getAction()) && waiting != 0) {
+                boolean recent = SystemClock.elapsedRealtime() - waiting < 8000;
+                waiting = 0;
+                if (recent) showCharging();
+            }
         }
     };
 
@@ -74,24 +81,27 @@ public class OverlayService extends AccessibilityService {
     private void islandRefresh() { if (island != null) island.refresh(); }
 
     private ChargeView charging;
+    /** Saat pengisi daya dicolok selagi layar mati; 0 bila tidak ada yang ditunggu. */
+    private long waiting;
     private final BroadcastReceiver power = new BroadcastReceiver() {
         @Override public void onReceive(Context c, Intent i) {
             if (Intent.ACTION_POWER_DISCONNECTED.equals(i.getAction())) {
+                waiting = 0;
                 if (charging != null) charging.close();
                 return;
             }
-            showCharging(true);
+            showCharging();
             if (island != null) island.charging();
         }
     };
 
-    private void showCharging(boolean retry) {
+    private void showCharging() {
         if (!Prefs.is(this, "chargeAnim", true) || charging != null
                 || getSystemService(android.media.AudioManager.class).getMode()
                         != android.media.AudioManager.MODE_NORMAL) return;
         if (!getSystemService(PowerManager.class).isInteractive()) {
             // Layar biasanya dinyalakan sistem sesaat setelah dicolok.
-            if (retry) keys.postDelayed(() -> showCharging(false), 900);
+            waiting = SystemClock.elapsedRealtime();
             return;
         }
         if (Prefs.is(this, "hideFullscreen", true) && fullscreen()) return;

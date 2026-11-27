@@ -57,11 +57,13 @@ done
 # Animasi cas: dicabut lalu dicolok, saat layar menyala dan saat layar terkunci.
 lepas() { adb shell dumpsys battery unplug; adb shell dumpsys battery set level 63; sleep 1.5; }
 colok() { adb shell dumpsys battery set ac 1; }
+# Emulator mematikan animasi; dinyalakan lagi agar gerak naik cairan terlihat.
+for S in window_animation_scale transition_animation_scale animator_duration_scale; do adb shell settings put global $S 1; done
 dinding; lepas; rekam reccas 8; colok; sleep 2.2; besar cas; sleep 5; cetak reccas; shot cashilang
 lepas; colok; sleep 1.5; adb shell input tap 540 1100; sleep 1; shot casketuk
 lepas; colok; sleep 1.5; adb shell dumpsys battery unplug; sleep 1; shot cascabut
 adb shell locksettings set-disabled false
-lepas; adb shell input keyevent KEYCODE_SLEEP; sleep 2; colok; sleep 1; adb shell input keyevent KEYCODE_WAKEUP; sleep 1.5; shot caskunci; sleep 6; shot caskunci2
+lepas; adb shell input keyevent KEYCODE_SLEEP; sleep 2; colok; sleep 2; adb shell input keyevent KEYCODE_WAKEUP; sleep 2; besar caskunci; sleep 6; shot caskunci2
 adb shell dumpsys battery reset; adb shell wm dismiss-keyguard
 echo "=== LOG ==="
 adb logcat -d | grep -E "panel dibuka|kaca bening|Choreographer.*Skipped" | head -12
