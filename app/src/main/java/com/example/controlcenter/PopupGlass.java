@@ -19,6 +19,7 @@ class PopupGlass extends Drawable {
     private final RectF box = new RectF();
     private final float d;
     private final int style, clear;
+    private final boolean blurred;
 
     /** Kebeningan 0 (pekat) sampai 100 (hampir bening). 50 adalah kepekatan asli tiap gaya. */
     static final String CLEAR = "popupClear";
@@ -31,53 +32,41 @@ class PopupGlass extends Drawable {
         d = context.getResources().getDisplayMetrics().density;
         this.style = style;
         this.clear = clear;
+        blurred = BlurPane.supported(context);
     }
 
     static int clearness(Context c) { return Prefs.of(c).getInt(CLEAR, 80); }
-
-    /** Warna dasar dengan kepekatan sesuai pilihan kebeningan. */
-    private int base(int color) {
-        int usual = color >>> 24;
-        int alpha = clear <= 50 ? 240 + (usual - 240) * clear / 50
-                : usual + (8 - usual) * (clear - 50) / 50;
-        return Theme.alpha(color, alpha);
-    }
 
     static int chosen(Context c) { return Prefs.of(c).getInt(KEY, LIQUID); }
 
     @Override public void draw(Canvas c) {
         box.set(getBounds());
-        Callback host = getCallback();
-        if (host instanceof android.view.View) Frost.begin((android.view.View) host);
-        if (Frost.active()) {
-            // Sama persis dengan kaca control center.
-            Glass.draw(c, paint, box, Math.min((style == FROSTED ? 26 : 34) * d,
-                    box.height() / 2), d, 0x1FFFFFFF, true);
-            Frost.end();
-        } else if (style == FROSTED) {
-            frosted(c);
-        } else {
-            liquid(c);
-        }
+        // Popup tembus langsung ke layar di belakangnya, bukan ke potret lama.
+        if (style == FROSTED) frosted(c);
+        else liquid(c);
         paint.setShader(null);
         paint.setStyle(Paint.Style.FILL);
     }
 
-    /** Bening seperti tetesan air: bagian tengah tipis, tepi tebal dan memantulkan cahaya. */
+    /** Bening: selaput tipis secukupnya agar tulisan terbaca, dengan tepi berkilau. */
     private void liquid(Canvas c) {
         float r = Math.min(34 * d, box.height() / 2);
-        fill(c, box, r, base(0x6B0C1228));
-        gradient(c, box, r, false, new int[]{0x2EFFFFFF, 0x05FFFFFF, 0x00FFFFFF, 0x1FFFFFFF},
+        fill(c, box, r, Theme.alpha(0xFF0A1020, Math.min(220, 90 + (100 - clear) * 3 / 2)));
+        gradient(c, box, r, false, new int[]{0x24FFFFFF, 0x05FFFFFF, 0x00FFFFFF, 0x14FFFFFF},
                 new float[]{0f, 0.35f, 0.7f, 1f});
-
         stroke(c, r, 0.5f * d, d, new int[]{0xB3FFFFFF, 0x26FFFFFF, 0x1FFFFFFF, 0x80FFFFFF});
     }
 
-    /** Kaca es yang bening: selaput lembut dengan garis tepi rata. */
+    /**
+     * Kaca es. Bila HP bisa memburamkan di belakangnya cukup selaput sedang; bila tidak,
+     * selaputnya pekat agar tulisan di belakang tidak menembus jelas.
+     */
     private void frosted(Canvas c) {
         float r = Math.min(26 * d, box.height() / 2);
-        fill(c, box, r, base(0xB8394264));
-        gradient(c, box, r, true, new int[]{0x2EFFFFFF, 0x1CFFFFFF, 0x14FFFFFF, 0x1CFFFFFF},
+        int alpha = (blurred ? 128 : 218) + (80 - clear) * 3 / 5;
+        fill(c, box, r, Theme.alpha(0xFF2E3850, Math.max(blurred ? 90 : 190,
+                Math.min(240, alpha))));
+        gradient(c, box, r, true, new int[]{0x33FFFFFF, 0x22FFFFFF, 0x1AFFFFFF, 0x22FFFFFF},
                 new float[]{0f, 0.35f, 0.75f, 1f});
         stroke(c, r, 0.5f * d, d, new int[]{0x66FFFFFF, 0x4DFFFFFF, 0x40FFFFFF, 0x59FFFFFF});
     }
@@ -95,7 +84,7 @@ class PopupGlass extends Drawable {
         paint.setColor(0xFFFFFFFF);
         for (int i = 0; i < colors.length; i++) {
             colors[i] = Theme.alpha(colors[i],
-                    Math.round((colors[i] >>> 24) * (1 - 0.6f * clear / 100f)));
+                    Math.round((colors[i] >>> 24) * (1 - 0.4f * clear / 100f)));
         }
         paint.setShader(new LinearGradient(area.left, area.top,
                 diagonal ? area.right : area.left, area.bottom, colors, stops,

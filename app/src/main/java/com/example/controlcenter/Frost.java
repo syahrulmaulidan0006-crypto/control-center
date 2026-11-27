@@ -38,6 +38,9 @@ final class Frost {
     private static Bitmap picture, soft;
     /** Selaput gelap tambahan (0..255) bila layar di belakang sangat terang. */
     private static int veil;
+    private static float[] bright;
+    /** Letak benda yang sedang digambar di layar. */
+    private static final Matrix global = new Matrix();
     private static boolean failed;
     private static int screenWidth, screenHeight, generation;
 
@@ -66,27 +69,32 @@ final class Frost {
                 @Override public void onSuccess(AccessibilityService.ScreenshotResult result) {
                     Bitmap clearer = null, reading = null;
                     int shade = 0;
+                    float[] map = null;
                     try (HardwareBuffer buffer = result.getHardwareBuffer()) {
                         Bitmap hard = Bitmap.wrapHardwareBuffer(buffer, result.getColorSpace());
                         Bitmap full = hard.copy(Bitmap.Config.ARGB_8888, false);
                         hard.recycle();
                         float haze = 1 - clear;
-                        clearer = soften(full, liquid ? 3 : 6,
-                                1 + Math.round((liquid ? 2 : 3) * haze));
-                        reading = soften(full, liquid ? 6 : 8,
-                                2 + Math.round((liquid ? 3 : 4) * haze));
+                        // Mode buram sengaja tidak terlalu bening.
+                        clearer = soften(full, liquid ? 3 : 8,
+                                liquid ? 1 + Math.round(2 * haze) : 3 + Math.round(3 * haze));
+                        reading = soften(full, liquid ? 6 : 10,
+                                liquid ? 2 + Math.round(3 * haze) : 4 + Math.round(3 * haze));
                         full.recycle();
                         shade = shade(reading);
+                        map = lightMap(reading);
                     } catch (RuntimeException | OutOfMemoryError e) {
                         android.util.Log.w("ControlCenter", "potret gagal diolah: " + e);
                     }
                     Bitmap first = clearer, second = reading;
                     int darker = shade;
+                    float[] lights = map;
                     main.post(() -> {
                         if (first != null && second != null) {
                             picture = first;
                             soft = second;
                             veil = darker;
+                            bright = lights;
                             failed = false;
                             screenWidth = screen.widthPixels;
                             screenHeight = screen.heightPixels;
@@ -160,6 +168,42 @@ final class Frost {
         return Math.round(255 * Math.max(0, Math.min(0.3f, (sum / 512 - 0.25f) * 0.6f)));
     }
 
+    private static final int COLUMNS = 24, ROWS = 52;
+
+    /** Terang tiap bagian layar, untuk menggelapkan kaca yang berada di atas bagian terang. */
+    private static float[] lightMap(Bitmap small) {
+        Bitmap tiny = Bitmap.createScaledBitmap(small, COLUMNS, ROWS, true);
+        float[] out = new float[COLUMNS * ROWS];
+        for (int y = 0; y < ROWS; y++) {
+            for (int x = 0; x < COLUMNS; x++) {
+                out[y * COLUMNS + x] = android.graphics.Color.luminance(tiny.getPixel(x, y));
+            }
+        }
+        if (tiny != small) tiny.recycle();
+        return out;
+    }
+
+    /** Tambahan gelap (0..100) untuk benda sedang digambar di bidang r. */
+    private static int under(RectF r) {
+        if (bright == null) return 0;
+        RectF on = new RectF(r);
+        global.mapRect(on);
+        int left = clamp(on.left / screenWidth * COLUMNS, COLUMNS);
+        int right = clamp(on.right / screenWidth * COLUMNS, COLUMNS);
+        int top = clamp(on.top / screenHeight * ROWS, ROWS);
+        int bottom = clamp(on.bottom / screenHeight * ROWS, ROWS);
+        float sum = 0;
+        for (int y = top; y <= bottom; y++) {
+            for (int x = left; x <= right; x++) sum += bright[y * COLUMNS + x];
+        }
+        float average = sum / ((right - left + 1) * (bottom - top + 1));
+        return Math.round(Math.max(0, Math.min(100, (average - 0.28f) * 230)));
+    }
+
+    private static int clamp(float value, int size) {
+        return Math.max(0, Math.min(size - 1, (int) value));
+    }
+
     private static void box(int[] in, int[] out, int w, int h, int r, boolean across) {
         int lines = across ? h : w, length = across ? w : h;
         int step = across ? 1 : w, next = across ? w : 1, size = 2 * r + 1;
@@ -213,6 +257,7 @@ final class Frost {
         android.util.DisplayMetrics now = view.getResources().getDisplayMetrics();
         if (now.widthPixels > now.heightPixels != screenWidth > screenHeight) return;
         if (!place.invert(toBitmap)) return;
+        global.set(place);
         toBitmap.preScale(screenWidth / (float) picture.getWidth(),
                 screenHeight / (float) picture.getHeight());
         active = true;
@@ -281,9 +326,10 @@ final class Frost {
         light.setShader(null);
         light.setStyle(Paint.Style.FILL);
         // Di dalam kaca hanya sedikit lebih terang daripada sekelilingnya.
-        light.setColor(Theme.alpha(0xFF000000, dark(clear) + (reading ? 18 : 0)));
+        light.setColor(Theme.alpha(0xFF000000,
+                Math.min(190, dark(clear) + (reading ? 18 : 0) + under(r))));
         c.drawRoundRect(r, radius, radius, light);
-        light.setColor(Theme.alpha(0xFFFFFFFF, liquid ? 14 : 28));
+        light.setColor(Theme.alpha(0xFFFFFFFF, liquid ? 14 : 34));
         c.drawRoundRect(r, radius, radius, light);
     }
 
@@ -320,12 +366,59 @@ final class Frost {
                 null, 0, triangles, 0, triangles.length, paint);
     }
 
+    /** Latar mode buram: seluruh layar di belakang panel diburamkan. */
+    static final class Wall extends android.graphics.drawable.Drawable {
+        private final Paint fill = new Paint(Paint.FILTER_BITMAP_FLAG);
+        private final float clear;
+        private int alpha = 255;
+
+        Wall(float clear) { this.clear = clear; }
+
+        @Override public void draw(Canvas c) {
+            Callback host = getCallback();
+            if (host instanceof View) Frost.begin((View) host);
+            RectF all = new RectF(getBounds());
+            if (active) {
+                BitmapShader shader = new BitmapShader(picture, Shader.TileMode.CLAMP,
+                        Shader.TileMode.CLAMP);
+                shader.setLocalMatrix(toBitmap);
+                fill.setShader(shader);
+                fill.setAlpha(alpha);
+                c.drawRect(all, fill);
+                fill.setShader(null);
+                fill.setColor(Theme.alpha(0xFF000000, dark(clear) * alpha / 255));
+                c.drawRect(all, fill);
+                fill.setColor(Theme.alpha(0xFFFFFFFF, 10 * alpha / 255));
+                c.drawRect(all, fill);
+            } else {
+                // Potret belum siap: gelapkan saja.
+                fill.setShader(null);
+                fill.setColor(Theme.alpha(0xFF000000, 150 * alpha / 255));
+                c.drawRect(all, fill);
+            }
+            Frost.end();
+        }
+
+        @Override public void setAlpha(int value) {
+            if (value == alpha) return;
+            alpha = value;
+            invalidateSelf();
+        }
+
+        @Override public int getAlpha() { return alpha; }
+
+        @Override public void setColorFilter(android.graphics.ColorFilter filter) { }
+
+        @Override public int getOpacity() { return android.graphics.PixelFormat.TRANSLUCENT; }
+    }
+
     /** Satu garis tipis di tepi: terang di kiri atas dan kanan bawah. */
     static void rim(Canvas c, RectF r, float radius, float density) {
         boolean liquid = Glass.style == PopupGlass.LIQUID;
         light.setStyle(Paint.Style.STROKE);
-        light.setColor(0xFFFFFFFF);
-        light.setShader(new LinearGradient(r.left, r.top, r.right, r.bottom, liquid
+        light.setColor(Glass.quiet ? 0x30FFFFFF : 0xFFFFFFFF);
+        light.setShader(Glass.quiet ? null
+                : new LinearGradient(r.left, r.top, r.right, r.bottom, liquid
                 ? new int[]{0xB3FFFFFF, 0x26FFFFFF, 0x1FFFFFFF, 0x73FFFFFF}
                 : new int[]{0x66FFFFFF, 0x40FFFFFF, 0x38FFFFFF, 0x52FFFFFF},
                 new float[]{0f, 0.35f, 0.65f, 1f}, Shader.TileMode.CLAMP));

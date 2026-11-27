@@ -32,9 +32,26 @@ class VolumeHud extends FrameLayout {
         }, null);
         slider.levelIcons(R.drawable.ic_volume0, R.drawable.ic_volume1);
         slider.announce = true;
+        // Tembus ke layar, dengan selaput secukupnya agar angkanya terbaca.
+        slider.backing = Glass.style != PopupGlass.FROSTED ? 0x59101420
+                : BlurPane.supported(service) ? 0x80283248 : 0xD02C3448;
         slider.setContentDescription("Volume");
         addView(slider, new LayoutParams(dp(54), dp(190)));
         slider.setAlpha(0);
+    }
+
+    private BlurPane pane;
+
+    /** Jendela buram di belakang popup; boleh null. */
+    void behind(BlurPane under) {
+        pane = under;
+        if (pane != null) pane.follow(slider);
+    }
+
+    @Override protected void onDetachedFromWindow() {
+        if (pane != null) pane.close();
+        pane = null;
+        super.onDetachedFromWindow();
     }
 
     static WindowManager.LayoutParams place(OverlayService service) {

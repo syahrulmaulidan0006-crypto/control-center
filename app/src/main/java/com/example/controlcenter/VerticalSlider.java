@@ -14,6 +14,8 @@ import java.util.function.BooleanSupplier;
 class VerticalSlider extends View {
     interface Listener { void onChange(float value); }
 
+    /** Warna selaput di belakang kaca; dipakai popup volume. */
+    int backing;
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path clip = new Path();
     private Drawable icon;
@@ -112,6 +114,13 @@ class VerticalSlider extends View {
         c.clipPath(clip);
         float d = getResources().getDisplayMetrics().density;
         Frost.begin(this);
+        if (backing != 0) {
+            paint.setShader(null);
+            paint.setColor(backing);
+            c.drawRect(0, 0, w, h, paint);
+        }
+        // Garis tepi penggeser dibuat redup.
+        Glass.quiet = true;
         Glass.draw(c, paint, new RectF(0, 0, w, h), r, d, 0x1FFFFFFF);
         boolean moving = false;
         if (liquid != null) {
@@ -123,6 +132,7 @@ class VerticalSlider extends View {
         }
         c.restore();
         Glass.shine(c, paint, new RectF(0, 0, w, h), r, d);
+        Glass.quiet = false;
         Frost.end();
         if (moving) postInvalidateOnAnimation();
 

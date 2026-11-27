@@ -48,9 +48,9 @@ class Deck extends FrameLayout {
     /** Latar diam di tempat; hanya isi halaman yang bergerak. */
     private float shownNow;
 
-    /** Mengganti gelapnya latar tanpa mengubah tingkat kemunculannya. */
-    void shade(int color) {
-        setBackground(new android.graphics.drawable.ColorDrawable(color));
+    /** Mengganti latar tanpa mengubah tingkat kemunculannya. */
+    void shade(android.graphics.drawable.Drawable background) {
+        setBackground(background);
         fade(shownNow);
     }
 
