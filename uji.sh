@@ -14,6 +14,7 @@ shot() {
   convert $1.png -resize 360x -quality 55 $1.jpg
   echo "GAMBAR-$1-AWAL"; base64 -w 200 $1.jpg; echo "GAMBAR-$1-AKHIR"
 }
+sudo apt-get -qq update >/dev/null; sudo apt-get -qq install -y ffmpeg imagemagick >/dev/null
 adb logcat -c
 buka() { adb shell input swipe $((1080*$1/100)) 5 $((1080*$1/100)) 900 $2; sleep 2; }
 tutup() { adb shell input keyevent KEYCODE_BACK; sleep 1.5; }
@@ -35,7 +36,7 @@ adb shell input swipe 150 810 650 810 5000 & sleep 3.3; shot geserkartu; wait; s
 rekam() { adb shell screenrecord --time-limit $2 --size 540x1140 /sdcard/$1.mp4 & REK=$!; sleep 1; }
 cetak() {
   wait $REK; adb pull /sdcard/$1.mp4 . >/dev/null
-  which ffmpeg >/dev/null || sudo apt-get -qq install -y ffmpeg >/dev/null 2>&1
+  which ffmpeg >/dev/null || { sudo apt-get -qq update >/dev/null; sudo apt-get -qq install -y ffmpeg >/dev/null; }
   ffmpeg -v error -i $1.mp4 -vf "fps=$3,scale=180:-1,tile=8x3" -frames:v 1 $1.png
   convert $1.png -quality 55 $1.jpg
   echo "GAMBAR-$1-AWAL"; base64 -w 200 $1.jpg; echo "GAMBAR-$1-AKHIR"
