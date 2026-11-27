@@ -232,14 +232,16 @@ public class MainActivity extends Activity {
         title("Kaca dan cairan", 18);
         toggle("Kaca bening asli (Android 11 ke atas)", "frost", true);
         note("Layar dipotret sesaat saat control center atau pusat notifikasi dibuka, "
-                + "hanya untuk latar kaca. Tidak disimpan atau dikirim. Popup tembus langsung.");
+                + "atau saat popup muncul, hanya untuk latar kaca. Tidak disimpan atau dikirim.");
         toggle("Isian cairan pada volume dan kecerahan", "liquid", true);
         toggle("Popup volume cairan saat tombol volume ditekan", "volumeHud", true);
         note("Mengatur volume media. Saat panggilan dan di layar kunci tetap memakai bawaan. "
                 + "Matikan bila tombol volume ingin dipakai memotret.");
         title("Gerak dan sentuhan", 18);
         toggle("Getar halus saat disentuh", Haptic.KEY, true);
-        toggle("Animasi saat mengisi daya", "chargeAnim", true);
+        toggle("Animasi cas selayar penuh", "chargeAnim", true);
+        note("Tampil sekitar 5 detik di atas animasi bawaan saat pengisi daya dicolok. "
+                + "Ketuk untuk menutup.");
         title("Kapsul melayang", 18);
         toggle("Tampilkan kapsul", Island.ON, true);
         note("Muncul di atas layar saat ada lagu, hitung mundur, atau baru mengisi daya. "

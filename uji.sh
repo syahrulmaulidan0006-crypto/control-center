@@ -42,10 +42,10 @@ for G in 0 1; do
   adb shell input keyevent KEYCODE_HOME; sleep 2; buka 85 250; besar rumah$G; tutup
   dinding; buka 85 250; besar panel$G; tutup
   setelan; buka 85 250; shot terang$G; tutup; tutup
-  # Popup harus tembus: layar di belakangnya diganti selagi popup masih tampil.
-  dinding; pesan a$G Rina "Sampai ketemu nanti sore"; sleep 1.2; besar popup$G
+  # Popup memakai kaca yang sama; saat layar berganti ia harus jadi tembus.
+  dinding; pesan a$G Rina "Sampai ketemu nanti sore"; sleep 1.5; besar popup$G
   adb shell am start -a android.settings.SETTINGS >/dev/null; sleep 1.5; besar popupganti$G; sleep 7
-  dinding; pesan b$G Budi "Jadi berangkat jam berapa"; sleep 8
+  dinding; pesan b$G Budi "Jadi berangkat jam berapa"; sleep 1; pesan c$G Sari "Oke siap"; sleep 1.5; shot popupdua$G; sleep 7
   buka 15 250; besar pusat$G; tutup; tutup
 done
 adb root >/dev/null; adb wait-for-device; sleep 3
@@ -54,6 +54,15 @@ naik() { adb shell "sendevent $DEV 1 115 1; sendevent $DEV 0 0 0; sleep 0.08; se
 for G in 0 1; do
   kirim --ei gaya $G; dinding; rekam rekvol$G 4; naik; sleep 0.5; naik; sleep 0.4; besar popvol$G; cetak rekvol$G; sleep 2.5
 done
+# Animasi cas: dicabut lalu dicolok, saat layar menyala dan saat layar terkunci.
+lepas() { adb shell dumpsys battery unplug; adb shell dumpsys battery set level 63; sleep 1.5; }
+colok() { adb shell dumpsys battery set ac 1; }
+dinding; lepas; rekam reccas 8; colok; sleep 2.2; besar cas; sleep 5; cetak reccas; shot cashilang
+lepas; colok; sleep 1.5; adb shell input tap 540 1100; sleep 1; shot casketuk
+lepas; colok; sleep 1.5; adb shell dumpsys battery unplug; sleep 1; shot cascabut
+adb shell locksettings set-disabled false
+lepas; adb shell input keyevent KEYCODE_SLEEP; sleep 2; colok; sleep 1; adb shell input keyevent KEYCODE_WAKEUP; sleep 1.5; shot caskunci; sleep 6; shot caskunci2
+adb shell dumpsys battery reset; adb shell wm dismiss-keyguard
 echo "=== LOG ==="
 adb logcat -d | grep -E "panel dibuka|kaca bening|Choreographer.*Skipped" | head -12
 adb logcat -d | grep -E "ControlCenter|AndroidRuntime|FATAL" | tail -80

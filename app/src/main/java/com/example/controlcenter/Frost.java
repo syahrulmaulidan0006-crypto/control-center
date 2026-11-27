@@ -236,6 +236,27 @@ final class Frost {
     /** Benar bila potret tidak bisa dipakai sama sekali di HP ini. */
     static boolean failed() { return failed; }
 
+    /** Nomor potret; berubah tiap ada potret baru. */
+    static int generation() { return generation; }
+
+    /** Jendela ini kembali memakai kaca biasa yang tembus, misalnya karena layarnya berganti. */
+    static void disable(View window) {
+        window.setTag(R.id.frost, null);
+        redraw(window);
+    }
+
+    static boolean enabled(View window) {
+        return window.getTag(R.id.frost) != null;
+    }
+
+    private static void redraw(View view) {
+        view.invalidate();
+        if (view instanceof android.view.ViewGroup) {
+            android.view.ViewGroup group = (android.view.ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) redraw(group.getChildAt(i));
+        }
+    }
+
     /** Benda berikutnya berada di atas kaca lain, jadi cukup diberi isian tipis. */
     static void inner(boolean value) { inner = value; }
 

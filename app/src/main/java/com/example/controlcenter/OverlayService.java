@@ -69,21 +69,31 @@ public class OverlayService extends AccessibilityService {
     private Island island;
 
     /** Panel atau popup sedang tampil, jadi kapsul menyingkir. */
-    boolean busy() { return panel != null || banner != null; }
+    boolean busy() { return panel != null || banner != null || charging != null; }
 
     private void islandRefresh() { if (island != null) island.refresh(); }
 
     private ChargeView charging;
     private final BroadcastReceiver power = new BroadcastReceiver() {
         @Override public void onReceive(Context c, Intent i) {
-            showCharging();
+            if (Intent.ACTION_POWER_DISCONNECTED.equals(i.getAction())) {
+                if (charging != null) charging.close();
+                return;
+            }
+            showCharging(true);
             if (island != null) island.charging();
         }
     };
 
-    private void showCharging() {
+    private void showCharging(boolean retry) {
         if (!Prefs.is(this, "chargeAnim", true) || charging != null
-                || !getSystemService(PowerManager.class).isInteractive()) return;
+                || getSystemService(android.media.AudioManager.class).getMode()
+                        != android.media.AudioManager.MODE_NORMAL) return;
+        if (!getSystemService(PowerManager.class).isInteractive()) {
+            // Layar biasanya dinyalakan sistem sesaat setelah dicolok.
+            if (retry) keys.postDelayed(() -> showCharging(false), 900);
+            return;
+        }
         if (Prefs.is(this, "hideFullscreen", true) && fullscreen()) return;
         // Sumber yang sama dengan angka baterai di status bar.
         Intent battery = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
@@ -92,21 +102,22 @@ public class OverlayService extends AccessibilityService {
                 / Math.max(1, battery.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, 100));
         Glass.load(this);
         ChargeView view = new ChargeView(this, Math.max(0, Math.min(100, level)));
-        // Tidak menerima sentuhan, jadi layar di bawahnya tetap bisa dipakai.
-        WindowManager.LayoutParams lp = params(dp(220), dp(220),
+        // Selayar penuh di atas animasi bawaan; satu ketukan menutupnya.
+        WindowManager.LayoutParams lp = params(-1, -1,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                        | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE);
-        lp.gravity = Gravity.CENTER;
+                        | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         try { wm.addView(view, lp); }
         catch (RuntimeException e) { return; }
         charging = view;
         android.util.Log.i("ControlCenter", "animasi cas: " + level);
+        islandRefresh();
         view.play(this::removeCharging);
     }
 
     private void removeCharging() {
         if (charging != null && charging.isAttachedToWindow()) wm.removeView(charging);
         charging = null;
+        islandRefresh();
     }
 
     private VolumeHud volume;
@@ -167,18 +178,20 @@ public class OverlayService extends AccessibilityService {
         if (volume != null && !volume.leaving()) return;
         if (volume != null) removeVolume(volume);
         Glass.load(this);
-        // Popup tembus langsung ke layar; jendela buramnya dibuat lebih dulu agar di bawah.
-        BlurPane pane = BlurPane.make(this, dp(27));
         VolumeHud next = new VolumeHud(this);
         try { wm.addView(next, VolumeHud.place(this)); }
-        catch (RuntimeException e) {
-            if (pane != null) pane.close();
-            return;
-        }
-        next.behind(pane);
+        catch (RuntimeException e) { return; }
         volume = next;
         android.util.Log.i("ControlCenter", "popup volume tampil");
-        next.post(next::enter);
+        // Kacanya sama dengan control center: layar dipotret tepat saat popup muncul.
+        thaw();
+        int before = Frost.generation();
+        Frost.capture(this, () -> {
+            if (next.entered()) return;
+            if (Frost.generation() != before) Frost.enable(next);
+            next.enter();
+        });
+        next.postDelayed(next::enter, 450);
     }
 
     void removeVolume(VolumeHud target) {
@@ -196,7 +209,25 @@ public class OverlayService extends AccessibilityService {
         if (instance != null) instance.islandRefresh();
     }
 
-    @Override public void onAccessibilityEvent(AccessibilityEvent event) { }
+    /** Jendela yang terakhir tampil di depan. */
+    private String front = "";
+
+    /** Layar berganti: potret di dalam popup sudah usang, jadi popup dibuat tembus. */
+    @Override public void onAccessibilityEvent(AccessibilityEvent event) {
+        if (event.getEventType() != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+                || getPackageName().contentEquals(String.valueOf(event.getPackageName()))) {
+            return;
+        }
+        String now = event.getPackageName() + "/" + event.getClassName();
+        if (now.equals(front)) return;
+        front = now;
+        if (banner instanceof Banner && !((Banner) banner).typing()
+                && Frost.enabled(banner)) {
+            Frost.disable(banner);
+            android.util.Log.i("ControlCenter", "popup dibuat tembus: layar berganti");
+        }
+        if (volume != null && Frost.enabled(volume)) Frost.disable(volume);
+    }
 
     @Override public void onInterrupt() { }
 
@@ -223,6 +254,7 @@ public class OverlayService extends AccessibilityService {
         }
         Focus.check(this, controls);
         IntentFilter plugged = new IntentFilter(Intent.ACTION_POWER_CONNECTED);
+        plugged.addAction(Intent.ACTION_POWER_DISCONNECTED);
         if (Build.VERSION.SDK_INT >= 33) {
             registerReceiver(power, plugged, Context.RECEIVER_NOT_EXPORTED);
         } else {
@@ -386,6 +418,15 @@ public class OverlayService extends AccessibilityService {
         return area;
     }
 
+    /**
+     * Sebelum memotret lagi, popup yang masih tampil dibuat tembus supaya ia tidak
+     * menggambar potret yang berisi dirinya sendiri.
+     */
+    private void thaw() {
+        if (banner != null && Frost.enabled(banner)) Frost.disable(banner);
+        if (volume != null && Frost.enabled(volume)) Frost.disable(volume);
+    }
+
     private boolean frosting() {
         return Build.VERSION.SDK_INT >= 30 && Prefs.is(this, "frost", true) && !Frost.failed();
     }
@@ -404,6 +445,7 @@ public class OverlayService extends AccessibilityService {
     /** Layar dipotret selagi belum tertutup jendela kita. */
     private void snapshot() {
         if (panel != null) return;
+        thaw();
         Frost.capture(this, () -> {
             if (deck == null) return;
             deck.shade(backdrop());
@@ -472,17 +514,17 @@ public class OverlayService extends AccessibilityService {
         if (Prefs.is(this, "hideFullscreen", true) && fullscreen()) {
             return skip("layar mendatar (mode game)");
         }
+        boolean reuse = false, replacing = banner != null;
         // Jangan ganti popup yang sedang dipakai mengetik balasan.
         if (banner != null) {
             if ((bannerParams.flags & WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE) == 0) {
                 return skip("sedang mengetik balasan");
             }
             // Popup lama keluar dengan animasi selagi yang baru masuk.
+            reuse = Frost.enabled(banner);
             banner.leave();
         }
         Glass.load(this);
-        BlurPane pane = BlurPane.make(this, dp(PopupGlass.chosen(this) == PopupGlass.FROSTED
-                ? 26 : 34));
         Banner next = new Banner(this, note);
         bannerParams = params(Math.min(getResources().getDisplayMetrics().widthPixels, dp(440)),
                 -2, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE);
@@ -490,14 +532,26 @@ public class OverlayService extends AccessibilityService {
         int id = getResources().getIdentifier("status_bar_height", "dimen", "android");
         bannerParams.y = id > 0 ? getResources().getDimensionPixelSize(id) : dp(28);
         try { wm.addView(next, bannerParams); }
-        catch (RuntimeException e) {
-            if (pane != null) pane.close();
-            return skip("gagal menampilkan: " + e.getMessage());
-        }
-        next.behind(pane);
+        catch (RuntimeException e) { return skip("gagal menampilkan: " + e.getMessage()); }
         banner = next;
         islandRefresh();
-        next.post(next::enter);
+        if (reuse) {
+            // Popup lama masih terlihat, jadi potret sebelum ia muncul dipakai lagi.
+            Frost.enable(next);
+            next.post(next::enter);
+        } else if (replacing) {
+            // Popup lama masih di layar, jadi memotret sekarang akan ikut memuatnya.
+            next.post(next::enter);
+        } else {
+            thaw();
+            int before = Frost.generation();
+            Frost.capture(this, () -> {
+                if (next.entered()) return;
+                if (Frost.generation() != before) Frost.enable(next);
+                next.enter();
+            });
+            next.postDelayed(next::enter, 600);
+        }
         Diag.popup(this, "tampil");
         android.util.Log.i("ControlCenter", "popup tampil: " + note.getPackageName());
         return true;

@@ -114,7 +114,7 @@ class VerticalSlider extends View {
         c.clipPath(clip);
         float d = getResources().getDisplayMetrics().density;
         Frost.begin(this);
-        if (backing != 0) {
+        if (backing != 0 && !Frost.active()) {
             paint.setShader(null);
             paint.setColor(backing);
             c.drawRect(0, 0, w, h, paint);
