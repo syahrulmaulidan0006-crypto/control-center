@@ -37,8 +37,11 @@ bening 0; buka 85 250; shot panel0; tutup
 bening 80
 kirim --ei henti 0
 # Tombol lewat perangkat keras tiruan: tombol suntikan tidak melewati saringan aksesibilitas.
-naik() { adb emu event send EV_KEY:KEY_VOLUMEUP:1 EV_SYN:0:0; sleep 0.08; adb emu event send EV_KEY:KEY_VOLUMEUP:0 EV_SYN:0:0; }
-turun() { adb emu event send EV_KEY:KEY_VOLUMEDOWN:1 EV_SYN:0:0; sleep 0.08; adb emu event send EV_KEY:KEY_VOLUMEDOWN:0 EV_SYN:0:0; }
+adb root >/dev/null; adb wait-for-device; sleep 3
+DEV=/dev/input/event1
+kunci() { adb shell "sendevent $DEV 1 $1 $2; sendevent $DEV 0 0 0"; }
+naik() { adb shell "sendevent $DEV 1 115 1; sendevent $DEV 0 0 0; sleep 0.08; sendevent $DEV 1 115 0; sendevent $DEV 0 0 0"; }
+turun() { adb shell "sendevent $DEV 1 114 1; sendevent $DEV 0 0 0; sleep 0.08; sendevent $DEV 1 114 0; sendevent $DEV 0 0 0"; }
 isi() { echo "VOLUME $1: $(adb shell cmd media_session volume --stream 3 --get | grep 'volume is')"; }
 adb shell cmd media_session volume --stream 3 --set 5 >/dev/null
 adb shell getevent -lp | grep -E "add device|name:|VOLUME"
@@ -46,9 +49,10 @@ dinding; isi awal
 rekam rekvol 6; naik; sleep 0.5; naik; sleep 0.5; naik; sleep 0.5; turun; cetak rekvol; isi "setelah +3 -1"
 sleep 3; dinding
 naik; sleep 0.6; shot popvol; naik; sleep 0.9; shot popvol2; sleep 3.5; shot popvolhilang; isi "setelah +2"
-adb emu event send EV_KEY:KEY_VOLUMEUP:1 EV_SYN:0:0; sleep 1.5; shot popvoltahan; adb emu event send EV_KEY:KEY_VOLUMEUP:0 EV_SYN:0:0; isi "ditahan"
+kunci 115 1; sleep 1.5; shot popvoltahan; kunci 115 0; isi "ditahan"
 sleep 0.2; adb shell input swipe 80 1000 80 1250 700; sleep 0.4; shot popvolgeser; isi "digeser"; sleep 3.5
 buka 85 250; naik; sleep 0.8; shot voldipanel; tutup
 echo "=== LOG ==="
+adb shell dumpsys accessibility | grep -iE "key|crash|bound|capabilities" | head -20
 adb logcat -d | grep -E "ControlCenter|AndroidRuntime|FATAL" | tail -80
 exit 0
