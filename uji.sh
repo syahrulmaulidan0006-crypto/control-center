@@ -37,7 +37,7 @@ rekam() { adb shell screenrecord --time-limit $2 --size 540x1140 /sdcard/$1.mp4 
 cetak() {
   wait $REK; adb pull /sdcard/$1.mp4 . >/dev/null
   which ffmpeg >/dev/null || { sudo apt-get -qq update >/dev/null; sudo apt-get -qq install -y ffmpeg >/dev/null; }
-  ffmpeg -v error -i $1.mp4 -vf "mpdecimate,fps=$3:round=up,mpdecimate,scale=180:-1,tile=8x4" -vsync vfr -frames:v 1 $1.png
+  ffmpeg -v error -reinit_filter 0 -i $1.mp4 -vf "mpdecimate,scale=180:380,tile=8x4" -vsync vfr -frames:v 1 $1.png
   convert $1.png -quality 55 $1.jpg
   echo "GAMBAR-$1-AWAL"; base64 -w 200 $1.jpg; echo "GAMBAR-$1-AKHIR"
 }
