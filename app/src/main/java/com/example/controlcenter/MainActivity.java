@@ -530,16 +530,23 @@ public class MainActivity extends Activity {
         c.setOrientation(LinearLayout.VERTICAL);
         c.setGravity(Gravity.NO_GRAVITY);
         int now = PopupGlass.clearness(this);
-        TextView name = label("Kebeningan popup: " + now + "%", 15, Color.WHITE);
+        TextView name = label("Kebeningan kaca: " + now + "%", 15, Color.WHITE);
         c.addView(name);
-        slider(c, "Kebeningan popup", 100, now, value -> {
-            name.setText("Kebeningan popup: " + value + "%");
+        slider(c, "Kebeningan kaca", 100, now, value -> {
+            name.setText("Kebeningan kaca: " + value + "%");
             for (int i = 0; i < samples.length; i++) {
                 samples[i].setBackground(new PopupGlass(this, i, value));
             }
-        }, value -> Prefs.of(this).edit().putInt(PopupGlass.CLEAR, value).commit());
-        TextView hint = label("0% pekat, 100% hampir bening. Makin bening, tulisan makin "
-                + "sulit dibaca di layar terang.", 13, MUTED);
+        }, value -> {
+            Prefs.of(this).edit().putInt(PopupGlass.CLEAR, value).commit();
+            // Kartu di halaman ini langsung memakai kebeningan baru.
+            Glass.load(this);
+            root.getRootView().invalidate();
+            rebuildHere();
+        });
+        TextView hint = label("Berlaku untuk popup, control center, dan pusat notifikasi. "
+                + "0% pekat, 100% sebening kaca. Makin bening, tulisan makin sulit "
+                + "dibaca di layar terang.", 13, MUTED);
         c.addView(hint);
     }
 

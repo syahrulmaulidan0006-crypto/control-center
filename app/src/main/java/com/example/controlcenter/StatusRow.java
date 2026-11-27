@@ -120,6 +120,7 @@ class StatusRow extends View {
         paint.setStyle(Paint.Style.FILL);
         paint.setTextSize(13 * d);
         paint.setFakeBoldText(true);
+        paint.setShadowLayer(3 * d, 0, d, 0x99000000);
         float baseline = mid - (paint.ascent() + paint.descent()) / 2;
 
         // Kiri: batang sinyal, operator, Wi-Fi.

@@ -22,6 +22,12 @@ class NoteCard extends LinearLayout {
     private float downX, downY;
     private boolean swiping;
     boolean rightOnly;
+    /** Bagian dari lebar kartu yang harus dilewati agar dianggap dibuang. */
+    static final float FAR = 0.38f;
+    /** Dipanggil tiap kartu berpindah ke samping. */
+    Runnable shift;
+    /** true selagi jari menggeser kartu, agar daftar tidak disusun ulang di tengahnya. */
+    java.util.function.Consumer<Boolean> held;
     private VelocityTracker velocity;
     private Runnable dismiss, pullDown, swipeUp;
     final TextView body;
@@ -193,21 +199,28 @@ class NoteCard extends LinearLayout {
         if (a == MotionEvent.ACTION_MOVE && swiping) {
             if (rightOnly) dx = Math.max(0, dx);
             setTranslationX(dx);
-            setAlpha(1 - Math.min(0.8f, Math.abs(dx) / Math.max(1, getWidth())));
+            setAlpha(1 - Math.min(0.5f, Math.abs(dx) / Math.max(1, getWidth()) * 0.7f));
+            if (shift != null) shift.run();
             return true;
         }
         if (a == MotionEvent.ACTION_UP || a == MotionEvent.ACTION_CANCEL) {
             if (swiping) {
                 velocity.computeCurrentVelocity(1000);
                 if (rightOnly) dx = Math.max(0, dx);
-                boolean gone = a == MotionEvent.ACTION_UP && dx != 0 && (Math.abs(dx) > getWidth() * 0.4f
-                        || Math.abs(velocity.getXVelocity()) > dp(900));
+                float speed = velocity.getXVelocity();
+                // Jentikan cepat membuang kartu hanya bila arahnya sama dengan geseran.
+                boolean flick = Math.abs(speed) > dp(900) && speed * dx > 0;
+                boolean back = Math.abs(speed) > dp(500) && speed * dx < 0;
+                boolean gone = a == MotionEvent.ACTION_UP && dx != 0 && !back
+                        && (Math.abs(dx) > getWidth() * FAR || flick);
                 swiping = false;
+                if (held != null) held.accept(false);
                 if (gone && dismiss != null) {
-                    animate().translationX(Math.signum(dx) * getWidth() * 1.2f).alpha(0)
-                            .setDuration(180).withEndAction(dismiss).start();
+                    fly(Math.signum(dx), Math.abs(speed));
                 } else {
-                    animate().translationX(0).alpha(1).setDuration(220).start();
+                    animate().translationX(0).alpha(1).setStartDelay(0).setDuration(340)
+                            .setInterpolator(new android.view.animation.OvershootInterpolator(1.1f))
+                            .setUpdateListener(x -> { if (shift != null) shift.run(); }).start();
                 }
                 return true;
             }
@@ -223,11 +236,24 @@ class NoteCard extends LinearLayout {
         return super.onTouchEvent(e);
     }
 
+    /** Kartu terbang keluar secepat jentikan jari, baru kemudian dibuang. */
+    private void fly(float way, float speed) {
+        float rest = getWidth() * 1.15f - Math.abs(getTranslationX());
+        long millis = speed > dp(900)
+                ? (long) Math.max(160, Math.min(300, rest * 1700 / speed)) : 280;
+        animate().translationX(way * getWidth() * 1.15f).alpha(0).scaleX(0.9f).scaleY(0.9f)
+                .setStartDelay(0).setDuration(millis)
+                .setInterpolator(new android.view.animation.DecelerateInterpolator(1.2f))
+                .setUpdateListener(x -> { if (shift != null) shift.run(); })
+                .withEndAction(dismiss).start();
+    }
+
     /** Kartu sedikit mengecil selagi disentuh. */
     private void touchFeel(int action) {
         float scale = action == MotionEvent.ACTION_DOWN ? 0.975f : 1;
         if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_UP
                 || action == MotionEvent.ACTION_CANCEL) {
+            animate().setUpdateListener(null);
             animate().scaleX(scale).scaleY(scale).setStartDelay(0).setDuration(160).start();
         }
     }
@@ -256,6 +282,7 @@ class NoteCard extends LinearLayout {
             if (rightOnly && e.getRawX() < downX) return;
             if (dx > ViewConfiguration.get(getContext()).getScaledTouchSlop() && dx > dy * 1.3f) {
                 swiping = true;
+                if (held != null) held.accept(true);
                 getParent().requestDisallowInterceptTouchEvent(true);
             }
         }
@@ -266,6 +293,7 @@ class NoteCard extends LinearLayout {
         t.setText(value);
         t.setTextSize(size);
         t.setTextColor(color);
+        t.setShadowLayer(dp(3), 0, dp(1), 0xB3000000);
         t.setSingleLine(true);
         t.setEllipsize(TextUtils.TruncateAt.END);
         return t;

@@ -576,7 +576,7 @@ class Panel extends Sheet {
     @Override void parallax(float offset) {
         // Bagian bawah tertinggal sedikit lebih jauh sehingga datang berurutan.
         for (int i = 0; i < box.getChildCount(); i++) {
-            box.getChildAt(i).setTranslationX(offset * dp(24 + i * 36));
+            box.getChildAt(i).setTranslationX(offset * dp(8 + i * 18));
         }
     }
 

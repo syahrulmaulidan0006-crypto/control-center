@@ -27,7 +27,7 @@ class PopupGlass extends Drawable {
     private final float d;
     private final int style, clear;
 
-    /** Kebeningan 0 (pekat) sampai 100 (hampir bening). 50 adalah bawaan tiap gaya. */
+    /** Kebeningan 0 (pekat) sampai 100 (hampir bening). 50 adalah kepekatan asli tiap gaya. */
     static final String CLEAR = "popupClear";
 
     PopupGlass(Context context, int style) {
@@ -40,7 +40,7 @@ class PopupGlass extends Drawable {
         this.clear = clear;
     }
 
-    static int clearness(Context c) { return Prefs.of(c).getInt(CLEAR, 50); }
+    static int clearness(Context c) { return Prefs.of(c).getInt(CLEAR, 80); }
 
     /** Warna dasar dengan kepekatan sesuai pilihan kebeningan. */
     private int base(int color) {
@@ -116,6 +116,10 @@ class PopupGlass extends Drawable {
             float[] stops) {
         paint.setStyle(Paint.Style.FILL);
         paint.setColor(0xFFFFFFFF);
+        for (int i = 0; i < colors.length; i++) {
+            colors[i] = Theme.alpha(colors[i],
+                    Math.round((colors[i] >>> 24) * (1 - 0.6f * clear / 100f)));
+        }
         paint.setShader(new LinearGradient(area.left, area.top,
                 diagonal ? area.right : area.left, area.bottom, colors, stops,
                 Shader.TileMode.CLAMP));

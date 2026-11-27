@@ -15,6 +15,7 @@ import android.content.res.Configuration;
 import android.app.KeyguardManager;
 import android.os.PowerManager;
 import android.service.notification.StatusBarNotification;
+import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
@@ -299,7 +300,6 @@ public class OverlayService extends AccessibilityService {
         Glass.load(this);
         panel = notifications ? new Center(this, controls) : new Panel(this, controls);
         android.util.Log.i("ControlCenter", "panel dibuka, pusat=" + notifications);
-        panel.setBackground(new ColorDrawable(BACKGROUND));
         panelParams = params(-1, -1, WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
         // Efek blur kaca hanya didukung Android 12+ (dan tergantung perangkat).
         if (Build.VERSION.SDK_INT >= 31) {
@@ -308,6 +308,8 @@ public class OverlayService extends AccessibilityService {
         }
         blur = 1;
         deck = new Deck(this, panel);
+        int dim = Math.round(Color.alpha(BACKGROUND) * (1 - 0.75f * Glass.clear));
+        deck.setBackground(new ColorDrawable(Theme.alpha(BACKGROUND, dim)));
         panel.setProgress(0);
         deck.fade(0);
         wm.addView(deck, panelParams);
@@ -407,7 +409,8 @@ public class OverlayService extends AccessibilityService {
         panel.setProgress(progress);
         deck.fade(Math.max(0, Math.min(1, progress)));
         if (Build.VERSION.SDK_INT >= 31) {
-            int target = Math.max(1, Math.round(dp(40) * Math.max(0, Math.min(1, progress))));
+            int target = Math.max(1, Math.round(
+                    dp(40) * (1 - 0.8f * Glass.clear) * Math.max(0, Math.min(1, progress))));
             if (Math.abs(target - blur) >= dp(3) || progress >= 1 || progress <= 0) {
                 blur = target;
                 panelParams.setBlurBehindRadius(blur);
@@ -428,7 +431,6 @@ public class OverlayService extends AccessibilityService {
     private Sheet neighbor(Sheet of) {
         Sheet other = of instanceof Center ? new Panel(this, controls)
                 : new Center(this, controls);
-        other.setBackground(new ColorDrawable(BACKGROUND));
         return other;
     }
 

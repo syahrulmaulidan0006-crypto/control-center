@@ -1,0 +1,4 @@
+<resources>
+    <!-- Penanda kunci notifikasi teratas pada baris pusat notifikasi. -->
+    <item name="front" type="id" />
+</resources>
