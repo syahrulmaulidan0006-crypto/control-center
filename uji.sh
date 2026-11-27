@@ -30,11 +30,25 @@ pesan c Sari "Fotonya sudah saya kirim"; sleep 8
 buka 85 250
 adb shell input swipe 150 1750 850 1750 6000 & sleep 2.2; shot tengah1; sleep 0.8; shot tengah2; wait; sleep 1.5; shot pusat
 adb shell input swipe 850 1750 150 1750 5000 & sleep 2.6; shot tengahbalik; wait; sleep 1.5; shot balik
-adb shell input swipe 150 1750 850 1750 150; sleep 2
-adb shell input swipe 150 760 650 760 5000 & sleep 3.3; shot geserkartu; wait; shot lepaskartu; sleep 2; shot sesudah
-adb shell input tap 540 760; sleep 1.5; shot buka
-adb shell input swipe 150 1000 900 1000 120; sleep 0.1; shot hapussatu; sleep 2; shot hapussatu2
-adb shell input tap 940 590; sleep 0.2; shot semua1; sleep 2.5; shot semua2
+tutup; sleep 1; buka 15 250
+adb shell input swipe 150 810 650 810 5000 & sleep 3.3; shot geserkartu; wait; sleep 2; shot sesudah
+rekam() { adb shell screenrecord --time-limit $2 --size 540x1140 /sdcard/$1.mp4 & REK=$!; sleep 1; }
+cetak() {
+  wait $REK; adb pull /sdcard/$1.mp4 . >/dev/null
+  which ffmpeg >/dev/null || sudo apt-get -qq install -y ffmpeg >/dev/null 2>&1
+  ffmpeg -v error -i $1.mp4 -vf "fps=$3,scale=180:-1,tile=8x3" -frames:v 1 $1.png
+  convert $1.png -quality 55 $1.jpg
+  echo "GAMBAR-$1-AWAL"; base64 -w 200 $1.jpg; echo "GAMBAR-$1-AKHIR"
+}
+rekam rekhapus 4; adb shell input swipe 150 810 850 810 400; cetak rekhapus 12
+sleep 1; shot sisa
+pesan a Rina "Satu"; pesan b Budi "Dua"; sleep 9; tutup; tutup; buka 15 250
+adb shell input tap 540 810; sleep 1.5; shot buka
+rekam rekbuka 4; adb shell input swipe 150 920 850 920 400; cetak rekbuka 12
+rekam reksemua 4; adb shell input tap 940 590; cetak reksemua 12
+sleep 2; shot semua2
+tutup; buka 85 250
+rekam rekgeser 4; adb shell input swipe 150 1750 850 1750 500; cetak rekgeser 14
 tutup
 pesan d Rina "Halo lagi"; sleep 8; buka 15 250; shot pusatbaru
 adb shell input swipe 150 760 950 760 150; sleep 3; shot pusatkosong

@@ -99,13 +99,13 @@ class Deck extends FrameLayout {
     }
 
     /**
-     * away: 0 = di tengah layar, 1 = sudah keluar. Halaman hanya bergeser sebagian sambil
+     * away: 0 = di tengah layar, 1 = sudah keluar. Halaman hanya bergeser sedikit sambil
      * melebur, sehingga tidak ada tepi halaman yang terlihat memotong isi.
      */
     private void page(Sheet v, float x, float away) {
         v.parallax(Math.signum(x) * away);
         float seen = Math.max(0, 1 - away * 1.5f);
-        v.setTranslationX(x * 0.55f);
+        v.setTranslationX(x * 0.28f);
         v.setAlpha(seen * seen * (3 - 2 * seen));
         v.setScaleX(1 - 0.07f * away);
         v.setScaleY(1 - 0.07f * away);

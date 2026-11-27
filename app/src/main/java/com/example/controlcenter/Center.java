@@ -470,12 +470,12 @@ class Center extends Sheet {
         int order = 0;
         for (int i = 0; i < box.getChildCount(); i++) {
             View part = box.getChildAt(i);
-            if (part != list) part.setTranslationX(offset * dp(8 + 12 * order++));
+            if (part != list) part.setTranslationX(offset * dp(4 + 5 * order++));
         }
         for (int i = 0; i < list.getChildCount(); i++) {
-            list.getChildAt(i).setTranslationX(offset * dp(8 + 12 * Math.min(order++, 7)));
+            list.getChildAt(i).setTranslationX(offset * dp(4 + 5 * Math.min(order++, 7)));
         }
-        torch.setTranslationX(offset * dp(30));
-        camera.setTranslationX(offset * dp(70));
+        torch.setTranslationX(offset * dp(10));
+        camera.setTranslationX(offset * dp(24));
     }
 }
