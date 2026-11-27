@@ -36,17 +36,19 @@ bening 100; buka 85 250; shot panel100; tutup
 bening 0; buka 85 250; shot panel0; tutup
 bening 80
 kirim --ei henti 0
-# Mulai dengan volume rendah agar perubahan terlihat.
+# Tombol lewat perangkat keras tiruan: tombol suntikan tidak melewati saringan aksesibilitas.
+naik() { adb emu event send EV_KEY:KEY_VOLUMEUP:1 EV_SYN:0:0; sleep 0.08; adb emu event send EV_KEY:KEY_VOLUMEUP:0 EV_SYN:0:0; }
+turun() { adb emu event send EV_KEY:KEY_VOLUMEDOWN:1 EV_SYN:0:0; sleep 0.08; adb emu event send EV_KEY:KEY_VOLUMEDOWN:0 EV_SYN:0:0; }
+isi() { echo "VOLUME $1: $(adb shell cmd media_session volume --stream 3 --get | grep 'volume is')"; }
 adb shell cmd media_session volume --stream 3 --set 5 >/dev/null
-dinding
-rekam rekvol 6; adb shell input keyevent 24; sleep 0.5; adb shell input keyevent 24; sleep 0.5; adb shell input keyevent 24; sleep 0.5; adb shell input keyevent 25; cetak rekvol
+adb shell getevent -lp | grep -E "add device|name:|VOLUME"
+dinding; isi awal
+rekam rekvol 6; naik; sleep 0.5; naik; sleep 0.5; naik; sleep 0.5; turun; cetak rekvol; isi "setelah +3 -1"
 sleep 3; dinding
-adb shell input keyevent 24; sleep 0.5; shot popvol; adb shell input keyevent 24; sleep 0.9; shot popvol2; sleep 3.5; shot popvolhilang
-adb shell input keyevent 24; sleep 0.8; adb shell input swipe 90 1100 90 800 700; sleep 0.4; shot popvolgeser; sleep 3.5
-adb shell cmd media_session volume --stream 3 --get
-dinding; pesan a Rina "Sampai ketemu nanti sore"; sleep 1.8; shot popup80; sleep 7
-rekam rekpopup 5; pesan b Budi "Jadi berangkat jam berapa"; cetak rekpopup; sleep 5
-dinding; buka 15 250; shot pusat
+naik; sleep 0.6; shot popvol; naik; sleep 0.9; shot popvol2; sleep 3.5; shot popvolhilang; isi "setelah +2"
+adb emu event send EV_KEY:KEY_VOLUMEUP:1 EV_SYN:0:0; sleep 1.5; shot popvoltahan; adb emu event send EV_KEY:KEY_VOLUMEUP:0 EV_SYN:0:0; isi "ditahan"
+sleep 0.2; adb shell input swipe 80 1000 80 1250 700; sleep 0.4; shot popvolgeser; isi "digeser"; sleep 3.5
+buka 85 250; naik; sleep 0.8; shot voldipanel; tutup
 echo "=== LOG ==="
 adb logcat -d | grep -E "ControlCenter|AndroidRuntime|FATAL" | tail -80
 exit 0
