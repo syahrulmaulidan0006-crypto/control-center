@@ -36,44 +36,17 @@ bening 100; buka 85 250; shot panel100; tutup
 bening 0; buka 85 250; shot panel0; tutup
 bening 80
 kirim --ei henti 0
-buka 85 250
-adb shell input swipe 912 1100 912 780 2500 & sleep 1.6; shot volgerak; wait; sleep 0.3; shot voldiam
-adb shell input swipe 663 1100 663 850 2500 & sleep 1.6; shot terang; wait
-rekam rekcair 4; adb shell input swipe 912 1050 912 850 350; sleep 1; adb shell input swipe 912 850 912 1050 350; cetak rekcair
-sleep 1; adb shell input swipe 912 820 912 820 900; sleep 1; shot voltekan
-tutup
+# Mulai dengan volume rendah agar perubahan terlihat.
+adb shell cmd media_session volume --stream 3 --set 5 >/dev/null
 dinding
-rekam rekvol 5; adb shell input keyevent 24; sleep 0.4; adb shell input keyevent 24; sleep 0.4; adb shell input keyevent 25; cetak rekvol
-adb shell input keyevent 24; sleep 0.7; shot popvol; sleep 3; shot popvolhilang
-pesan a Rina "Sampai ketemu nanti sore"; sleep 1.8; shot popup80; sleep 7
-pesan b Budi "Jadi berangkat jam berapa"; sleep 8
-buka 15 250; shot pusat
-rekam rekgeser 4; adb shell input swipe 150 1750 850 1750 500; cetak rekgeser
-tutup; tutup
-dinding; buka 85 250
-adb shell input tap 160 1575; sleep 1.5; shot pilihrekam
-tutup; tutup
-dinding; kirim --ei rekam 0; sleep 2; shot izin
-tutup
-adb shell appops set $P PROJECT_MEDIA allow
-dinding; kirim --ei rekam 0; sleep 4; shot merekam
-adb shell input tap 540 50; sleep 1.5; shot kapsulbuka
-sleep 4; buka 85 250; shot panelrekam; adb shell input tap 160 1575; sleep 4; shot selesai
-tutup; tutup
-for M in 1 2; do
-  dinding; kirim --ei rekam $M; sleep 6
-  adb shell input tap 540 50; sleep 1.2
-  [ $M = 1 ] && shot kapsulmik
-  adb shell input swipe 540 1200 540 700 300; sleep 2
-  buka 85 250; adb shell input tap 160 1575; sleep 4; tutup
-done
-echo "=== BERKAS ==="
-adb shell ls -l /sdcard/Movies/ControlCenter/
-mkdir -p hasil; adb pull /sdcard/Movies/ControlCenter/. hasil/ >/dev/null
-n=0; for f in hasil/*; do n=$((n+1)); echo "$f"; ffprobe -v error -show_entries stream=codec_name,width,height,nb_frames,duration -of compact "$f"
-  ffmpeg -v error -i "$f" -vf "fps=1,scale=180:380,tile=6x2" -frames:v 1 video$n.png; convert video$n.png -quality 55 video$n.jpg
-  echo "GAMBAR-video$n-AWAL"; base64 -w 200 video$n.jpg; echo "GAMBAR-video$n-AKHIR"; done
-adb shell am start -n $P/.MainActivity; sleep 4; adb shell input tap 400 2027; sleep 2; shot setelan1; adb shell input swipe 540 1700 540 700 600; sleep 1; shot setelan2; adb shell input swipe 540 1700 540 700 600; sleep 1; shot setelan3
+rekam rekvol 6; adb shell input keyevent 24; sleep 0.5; adb shell input keyevent 24; sleep 0.5; adb shell input keyevent 24; sleep 0.5; adb shell input keyevent 25; cetak rekvol
+sleep 3; dinding
+adb shell input keyevent 24; sleep 0.5; shot popvol; adb shell input keyevent 24; sleep 0.9; shot popvol2; sleep 3.5; shot popvolhilang
+adb shell input keyevent 24; sleep 0.8; adb shell input swipe 90 1100 90 800 700; sleep 0.4; shot popvolgeser; sleep 3.5
+adb shell cmd media_session volume --stream 3 --get
+dinding; pesan a Rina "Sampai ketemu nanti sore"; sleep 1.8; shot popup80; sleep 7
+rekam rekpopup 5; pesan b Budi "Jadi berangkat jam berapa"; cetak rekpopup; sleep 5
+dinding; buka 15 250; shot pusat
 echo "=== LOG ==="
 adb logcat -d | grep -E "ControlCenter|AndroidRuntime|FATAL" | tail -80
 exit 0
