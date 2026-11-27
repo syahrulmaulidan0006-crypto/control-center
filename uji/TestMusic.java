@@ -21,6 +21,10 @@ public class TestMusic extends BroadcastReceiver {
                             + intent.getIntExtra("timer", 0) * 1000L).commit();
             return;
         }
+        if (intent.hasExtra("rekam")) {
+            RecordActivity.open(context.getApplicationContext(), intent.getIntExtra("rekam", 0));
+            return;
+        }
         if (intent.hasExtra("ukuran")) {
             java.util.List<Item> all = Item.load(context);
             int[][] sizes = {{0, 1}, {3, 1}, {4, 2}, {7, 1}};

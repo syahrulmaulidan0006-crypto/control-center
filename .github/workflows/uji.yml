@@ -13,8 +13,8 @@ jobs:
         with: { gradle-version: '8.7' }
       - name: Tambahkan pemutar musik tiruan
         run: |
-          cp uji/TestMusic.java app/src/main/java/com/example/controlcenter/
-          sed -i 's#</application>#<receiver android:name=".TestMusic" android:exported="true" /></application>#' app/src/main/AndroidManifest.xml
+          cp uji/TestMusic.java uji/TestWall.java app/src/main/java/com/example/controlcenter/
+          sed -i 's#</application>#<receiver android:name=".TestMusic" android:exported="true" /><activity android:name=".TestWall" android:exported="true" android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" /></application>#' app/src/main/AndroidManifest.xml
       - run: gradle assembleDebug
       - name: Izinkan KVM
         run: |
