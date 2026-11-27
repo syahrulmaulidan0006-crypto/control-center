@@ -180,6 +180,15 @@ class TileView extends View {
         icon.setTint(fill > 0.5f ? onAccent : 0xFFFFFFFF);
         c.save();
         float alpha = pose(c, cx, cy, r);
+        if (fill <= 0.5f) {
+            // Bayangan tipis menjaga ikon putih terbaca di atas kaca bening.
+            icon.setTint(0xFF000000);
+            icon.setAlpha(Math.round(60 * alpha));
+            c.translate(0, 1.5f * d);
+            icon.draw(c);
+            c.translate(0, -1.5f * d);
+            icon.setTint(0xFFFFFFFF);
+        }
         icon.setAlpha(Math.round(255 * alpha));
         icon.draw(c);
         c.restore();
