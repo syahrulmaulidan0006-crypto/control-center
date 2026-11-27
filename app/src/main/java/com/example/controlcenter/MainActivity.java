@@ -230,7 +230,7 @@ public class MainActivity extends Activity {
         title("Gaya kaca", 18);
         popupStyles();
         title("Kaca dan cairan", 18);
-        toggle("Kaca buram asli (Android 11 ke atas)", "frost", true);
+        toggle("Kaca bening asli (Android 11 ke atas)", "frost", true);
         note("Layar dipotret sesaat saat panel atau popup muncul, hanya untuk latar kaca. "
                 + "Tidak disimpan atau dikirim.");
         toggle("Isian cairan pada volume dan kecerahan", "liquid", true);
@@ -491,7 +491,8 @@ public class MainActivity extends Activity {
 
     /** Dua contoh popup di atas latar berwarna; ketuk untuk memilih. */
     private void popupStyles() {
-        note("Dipakai untuk popup, tombol, dan kartu");
+        note("Dipakai di semua bagian: control center, pusat notifikasi, popup, dan volume. "
+                + "Contoh di bawah hanya gambaran.");
         int chosen = PopupGlass.chosen(this);
         View[] samples = new View[PopupGlass.NAMES.length];
         for (int i = 0; i < PopupGlass.NAMES.length; i++) {
@@ -552,9 +553,8 @@ public class MainActivity extends Activity {
             root.getRootView().invalidate();
             rebuildHere();
         });
-        TextView hint = label("Berlaku untuk popup, control center, dan pusat notifikasi. "
-                + "0% pekat, 100% sebening kaca. Makin bening, tulisan makin sulit "
-                + "dibaca di layar terang.", 13, MUTED);
+        TextView hint = label("Berlaku untuk kedua gaya. 0% pekat, 100% sebening kaca. "
+                + "Makin bening, tulisan makin sulit dibaca di layar terang.", 13, MUTED);
         c.addView(hint);
     }
 

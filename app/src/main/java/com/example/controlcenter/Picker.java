@@ -49,7 +49,7 @@ class Picker extends FrameLayout {
         card.setOrientation(LinearLayout.VERTICAL);
         card.setClickable(true);
         card.setPadding(dp(18), dp(20), dp(18), dp(16));
-        card.setBackground(new Glass(context, 40, 0x4D1B2440));
+        card.setBackground(new Glass(context, 40, 0x4D1B2440).reading());
 
         LinearLayout head = new LinearLayout(context);
         head.setGravity(Gravity.CENTER_VERTICAL);

@@ -29,30 +29,29 @@ cetak() {
   convert $1.png -quality 55 $1.jpg
   echo "GAMBAR-$1-AWAL"; base64 -w 200 $1.jpg; echo "GAMBAR-$1-AKHIR"
 }
+besar() { adb exec-out screencap -p > $1.png; convert $1.png -resize 720x -quality 70 $1.jpg; echo "GAMBAR-$1-AWAL"; base64 -w 200 $1.jpg; echo "GAMBAR-$1-AKHIR"; }
+bening 80; kirim --ei henti 0
+for G in 0 1; do
+  kirim --ei gaya $G
+  adb shell input keyevent KEYCODE_HOME; sleep 2; buka 85 250; besar rumah$G; tutup
+  dinding; buka 85 250; besar panel$G
+  adb shell input swipe 912 960 912 960 900; sleep 1.5; shot pilih$G; tutup; tutup
+  dinding; pesan a$G Rina "Sampai ketemu nanti sore"; sleep 1.8; besar popup$G; sleep 7
+  pesan b$G Budi "Jadi berangkat jam berapa"; sleep 8
+  buka 15 250; besar pusat$G; tutup; tutup
+  adb shell am start -a android.settings.SETTINGS >/dev/null; sleep 3; buka 85 250; shot terang$G; tutup; tutup
+done
 kirim --ei gaya 0
-dinding; shot dinding
-buka 85 250; shot panel80; tutup
-bening 100; buka 85 250; shot panel100; tutup
-bening 0; buka 85 250; shot panel0; tutup
-bening 80
-kirim --ei henti 0
-# Tombol lewat perangkat keras tiruan: tombol suntikan tidak melewati saringan aksesibilitas.
+dinding; rekam rekbuka 4; adb shell input swipe 918 5 918 900 900; sleep 1; cetak rekbuka; tutup
+bening 40; dinding; buka 85 250; shot panel40; tutup; bening 80
+kirim --ei gaya 0
+adb shell am start -n $P/.MainActivity; sleep 4; adb shell input tap 400 2027; sleep 2; shot setelan1; adb shell input swipe 540 1700 540 900 600; sleep 1; shot setelan2
 adb root >/dev/null; adb wait-for-device; sleep 3
 DEV=/dev/input/event1
 kunci() { adb shell "sendevent $DEV 1 $1 $2; sendevent $DEV 0 0 0"; }
 naik() { adb shell "sendevent $DEV 1 115 1; sendevent $DEV 0 0 0; sleep 0.08; sendevent $DEV 1 115 0; sendevent $DEV 0 0 0"; }
 turun() { adb shell "sendevent $DEV 1 114 1; sendevent $DEV 0 0 0; sleep 0.08; sendevent $DEV 1 114 0; sendevent $DEV 0 0 0"; }
-isi() { echo "VOLUME $1: $(adb shell cmd media_session volume --stream 3 --get | grep 'volume is')"; }
-adb shell cmd media_session volume --stream 3 --set 5 >/dev/null
-adb shell getevent -lp | grep -E "add device|name:|VOLUME"
-dinding; isi awal
-rekam rekvol 6; naik; sleep 0.5; naik; sleep 0.5; naik; sleep 0.5; turun; cetak rekvol; isi "setelah +3 -1"
-sleep 3; dinding
-naik; sleep 0.6; shot popvol; naik; sleep 0.9; shot popvol2; sleep 3.5; shot popvolhilang; isi "setelah +2"
-kunci 115 1; sleep 1.5; shot popvoltahan; kunci 115 0; isi "ditahan"
-sleep 0.2; adb shell input swipe 80 1000 80 1250 700; sleep 0.4; shot popvolgeser; isi "digeser"; sleep 3.5
-buka 85 250; naik; sleep 0.8; shot voldipanel; tutup
+dinding; naik; sleep 0.8; besar popvol; sleep 3
 echo "=== LOG ==="
-adb shell dumpsys accessibility | grep -iE "key|crash|bound|capabilities" | head -20
 adb logcat -d | grep -E "ControlCenter|AndroidRuntime|FATAL" | tail -80
 exit 0

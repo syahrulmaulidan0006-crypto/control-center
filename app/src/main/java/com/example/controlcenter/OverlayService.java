@@ -384,13 +384,25 @@ public class OverlayService extends AccessibilityService {
     }
 
     private boolean frosting() {
-        return Build.VERSION.SDK_INT >= 30 && Prefs.is(this, "frost", true) && Frost.ready();
+        return Build.VERSION.SDK_INT >= 30 && Prefs.is(this, "frost", true) && !Frost.failed();
+    }
+
+    /** Gelapnya latar di sekeliling kaca. */
+    private int backdrop() {
+        // Dengan kaca bening asli, gelapnya disamakan dengan bagian dalam kaca.
+        int dim = frosting() ? Frost.dark(Glass.clear)
+                : Math.round(Color.alpha(BACKGROUND) * (1 - 0.75f * Glass.clear));
+        return Theme.alpha(BACKGROUND, dim);
     }
 
     /** Layar dipotret selagi belum tertutup jendela kita. */
     private void snapshot() {
         if (panel != null) return;
-        Frost.capture(this, () -> { if (deck != null) deck.invalidate(); });
+        Frost.capture(this, () -> {
+            if (deck == null) return;
+            deck.shade(backdrop());
+            deck.invalidate();
+        });
     }
 
     private void addPanel(boolean notifications) {
@@ -409,10 +421,7 @@ public class OverlayService extends AccessibilityService {
         blur = 1;
         deck = new Deck(this, panel);
         Frost.enable(deck);
-        // Dengan kaca buram asli, latar dibiarkan hampir utuh seperti dilihat lewat kaca.
-        int dim = Math.round(Color.alpha(BACKGROUND)
-                * (frosting() ? 0.55f - 0.4f * Glass.clear : 1 - 0.75f * Glass.clear));
-        deck.setBackground(new ColorDrawable(Theme.alpha(BACKGROUND, dim)));
+        deck.setBackground(new ColorDrawable(backdrop()));
         panel.setProgress(0);
         deck.fade(0);
         wm.addView(deck, panelParams);
@@ -515,8 +524,11 @@ public class OverlayService extends AccessibilityService {
         deck.fade(Math.max(0, Math.min(1, progress)));
         if (Build.VERSION.SDK_INT >= 31) {
             int target = Math.max(1, Math.round(
-                    dp(40) * (frosting() ? Math.max(0, 0.9f - Glass.clear) * 0.8f
-                            : 1 - 0.8f * Glass.clear) * Math.max(0, Math.min(1, progress))));
+                    // Luar kaca harus menyambung dengan isinya: liquid tetap tajam,
+                    // glassmorphism sedikit buram.
+                    (frosting() ? (Glass.style == PopupGlass.FROSTED ? dp(7) : 0)
+                            : dp(40) * (1 - 0.8f * Glass.clear))
+                            * Math.max(0, Math.min(1, progress))));
             if (Math.abs(target - blur) >= dp(3) || progress >= 1 || progress <= 0) {
                 blur = target;
                 panelParams.setBlurBehindRadius(blur);

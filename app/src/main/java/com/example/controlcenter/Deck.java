@@ -46,7 +46,16 @@ class Deck extends FrameLayout {
     private static float place(Sheet s) { return s instanceof Center ? 0 : 1; }
 
     /** Latar diam di tempat; hanya isi halaman yang bergerak. */
+    private float shownNow;
+
+    /** Mengganti gelapnya latar tanpa mengubah tingkat kemunculannya. */
+    void shade(int color) {
+        setBackground(new android.graphics.drawable.ColorDrawable(color));
+        fade(shownNow);
+    }
+
     void fade(float shown) {
+        shownNow = shown;
         dots.setAlpha(shown);
         if (getBackground() != null) {
             getBackground().setAlpha(Math.round(255 * Math.max(0, Math.min(1, shown * 1.4f))));

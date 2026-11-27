@@ -17,6 +17,7 @@ class Glass extends Drawable {
     private final RectF box = new RectF();
     private final float radius, density;
     private final int tint;
+    private boolean reading;
 
     Glass(Context context, int radiusDp, int tint) {
         density = context.getResources().getDisplayMetrics().density;
@@ -24,12 +25,18 @@ class Glass extends Drawable {
         this.tint = tint;
     }
 
+    /** Untuk permukaan berisi tulisan: latarnya sedikit lebih buram. */
+    Glass reading() {
+        reading = true;
+        return this;
+    }
+
     @Override public void draw(Canvas c) {
         box.set(getBounds());
         Callback host = getCallback();
         if (host instanceof android.view.View) Frost.begin((android.view.View) host);
         draw(c, paint, box, Math.min(radius, Math.min(box.width(), box.height()) / 2),
-                density, tint);
+                density, tint, reading);
         Frost.end();
     }
 
@@ -57,51 +64,43 @@ class Glass extends Drawable {
     }
 
     static void draw(Canvas c, Paint paint, RectF r, float radius, float density, int tint) {
+        draw(c, paint, r, radius, density, tint, false);
+    }
+
+    static void draw(Canvas c, Paint paint, RectF r, float radius, float density, int tint,
+            boolean reading) {
         boolean frosted = style == PopupGlass.FROSTED;
         paint.setStyle(Paint.Style.FILL);
         paint.setShader(null);
         if (Frost.active()) {
-            Frost.draw(c, r, radius, density, clear);
-            // Warna khas benda (tombol aktif, tombol hapus) tetap di atas kacanya.
-            paint.setColor(thin(tint, 0.82f));
-            c.drawRoundRect(r, radius, radius, paint);
-            if (frosted) {
-                paint.setColor(0x1FDCE4FF);
+            if (Frost.isInner()) {
+                // Di atas kaca lain cukup isian tipis, tanpa lapisan latar kedua.
+                paint.setColor(0x1CFFFFFF);
                 c.drawRoundRect(r, radius, radius, paint);
-                paint.setColor(0xFFFFFFFF);
-                paint.setShader(new BitmapShader(PopupGlass.grain(), Shader.TileMode.REPEAT,
-                        Shader.TileMode.REPEAT));
-                c.drawRoundRect(r, radius, radius, paint);
-                paint.setShader(null);
+            } else {
+                Frost.draw(c, r, radius, density, clear, reading);
             }
-            Frost.rim(c, r, radius, density);
+            // Warna khas benda (tombol aktif, tombol hapus) tetap di atas kacanya.
+            paint.setColor(thin(tint, 0.9f));
+            c.drawRoundRect(r, radius, radius, paint);
+            if (!Frost.isInner()) Frost.rim(c, r, radius, density);
             return;
         }
         paint.setColor(thin(tint, 0.82f));
         c.drawRoundRect(r, radius, radius, paint);
-        if (frosted) {
-            // Lapisan susu dan bintik halus membuat kaca terlihat buram.
-            paint.setColor(thin(0x14DCE4FF, 0.65f));
-            c.drawRoundRect(r, radius, radius, paint);
-        }
         paint.setColor(0xFFFFFFFF);
         paint.setShader(new LinearGradient(r.left, r.top, r.right, r.bottom, thin(frosted
-                ? new int[]{0x30FFFFFF, 0x16FFFFFF, 0x0CFFFFFF, 0x14FFFFFF}
-                : new int[]{0x2EFFFFFF, 0x06FFFFFF, 0x02FFFFFF, 0x1CFFFFFF},
+                ? new int[]{0x2EFFFFFF, 0x22FFFFFF, 0x1CFFFFFF, 0x22FFFFFF}
+                : new int[]{0x24FFFFFF, 0x08FFFFFF, 0x05FFFFFF, 0x16FFFFFF},
                 frosted ? 0.6f : 0.75f), new float[]{0f, 0.4f, 0.7f, 1f}, Shader.TileMode.CLAMP));
         c.drawRoundRect(r, radius, radius, paint);
-        if (frosted) {
-            paint.setShader(new BitmapShader(PopupGlass.grain(), Shader.TileMode.REPEAT,
-                    Shader.TileMode.REPEAT));
-            c.drawRoundRect(r, radius, radius, paint);
-        }
         shine(c, paint, r, radius, density);
     }
 
-    /** Pantulan di tepi kaca. */
+    /** Satu garis tipis di tepi kaca. */
     static void shine(Canvas c, Paint paint, RectF r, float radius, float density) {
         if (Frost.active()) {
-            Frost.rim(c, r, radius, density);
+            if (!Frost.isInner()) Frost.rim(c, r, radius, density);
             return;
         }
         paint.setStyle(Paint.Style.STROKE);
@@ -109,26 +108,12 @@ class Glass extends Drawable {
         if (style == PopupGlass.FROSTED) {
             paint.setShader(null);
             paint.setColor(0x4DFFFFFF);
-            edge(c, paint, r, radius, density * 0.5f, density);
         } else {
-            // Lengkung tebal yang membias: lebarnya mengikuti ukuran benda.
-            float lens = Math.min(Math.min(r.width(), r.height()) * 0.2f, density * 14);
             paint.setShader(new LinearGradient(r.left, r.top, r.right, r.bottom,
-                    thin(new int[]{0x2BFFFFFF, 0x03FFFFFF, 0x03FFFFFF, 0x22FFFFFF}, 0.45f),
+                    new int[]{0xB3FFFFFF, 0x26FFFFFF, 0x1FFFFFFF, 0x73FFFFFF},
                     new float[]{0f, 0.35f, 0.65f, 1f}, Shader.TileMode.CLAMP));
-            for (int i = 3; i >= 1; i--) {
-                float width = lens * i / 3f;
-                edge(c, paint, r, radius, width / 2, width);
-            }
-            paint.setShader(new LinearGradient(r.left, r.top, r.right, r.bottom,
-                    new int[]{0x6066E0FF, 0x0066E0FF, 0x00FF7AC8, 0x60FF7AC8},
-                    new float[]{0f, 0.35f, 0.65f, 1f}, Shader.TileMode.CLAMP));
-            edge(c, paint, r, radius, density * 2f, density * 1.2f);
-            paint.setShader(new LinearGradient(r.left, r.top, r.right, r.bottom,
-                    new int[]{0xE6FFFFFF, 0x24FFFFFF, 0x1AFFFFFF, 0xC7FFFFFF},
-                    new float[]{0f, 0.35f, 0.65f, 1f}, Shader.TileMode.CLAMP));
-            edge(c, paint, r, radius, density * 0.7f, density * 1.4f);
         }
+        edge(c, paint, r, radius, density * 0.5f, density);
         paint.setShader(null);
         paint.setStyle(Paint.Style.FILL);
     }
