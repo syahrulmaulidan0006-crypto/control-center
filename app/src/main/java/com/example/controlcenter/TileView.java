@@ -160,6 +160,7 @@ class TileView extends View {
             cy = h * 0.37f;
         }
         RectF circle = new RectF(cx - r, cy - r, cx + r, cy + r);
+        if (wide || large) Frost.inner(true);
         Glass.draw(c, paint, circle, r, d, 0x1FFFFFFF);
         if (fill > 0) {
             paint.setColor(Theme.alpha(accent, 0xE0));

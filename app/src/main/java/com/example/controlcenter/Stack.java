@@ -43,7 +43,7 @@ class Stack extends FrameLayout {
                     front.getBottom() - 2 * radius + i * STEP * d,
                     front.getRight() - i * SIDE * d,
                     front.getBottom() + i * STEP * d);
-            Glass.draw(c, paint, layer, radius, d, i == 1 ? 0x24FFFFFF : 0x12FFFFFF);
+            Glass.draw(c, paint, layer, radius, d, i == 1 ? 0x24FFFFFF : 0x12FFFFFF, true);
             above = layer;
         }
         Frost.end();

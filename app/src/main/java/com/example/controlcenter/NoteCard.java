@@ -37,7 +37,7 @@ class NoteCard extends LinearLayout {
         super(context);
         setOrientation(VERTICAL);
         setPadding(dp(14), dp(14), dp(14), dp(14));
-        setBackground(new Glass(context, 28, tint));
+        setBackground(new Glass(context, 28, tint).reading());
         setClickable(true);
 
         LinearLayout row = new LinearLayout(context);
