@@ -16,6 +16,10 @@ class Liquid {
         return new Liquid(0xFF1E9BEF, 0xFF0A63D8, 0xFF06358F);
     }
 
+    static Liquid green() {
+        return new Liquid(0xFF3BE08F, 0xFF14B36B, 0xFF0A6B45);
+    }
+
     static Liquid amber() {
         return new Liquid(0xFFF89B26, 0xFFE9681A, 0xFFA83A12);
     }

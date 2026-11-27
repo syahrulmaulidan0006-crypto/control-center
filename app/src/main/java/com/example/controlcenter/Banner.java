@@ -11,7 +11,6 @@ class Banner extends FrameLayout {
     private final NoteCard card;
     private boolean typing, leaving, entered;
     private final Runnable timeout = this::leave;
-    private BlurPane pane;
 
     Banner(OverlayService service, StatusBarNotification note) {
         super(service);
@@ -43,17 +42,9 @@ class Banner extends FrameLayout {
         }
     }
 
-    /** Jendela buram di belakang popup; boleh null. */
-    void behind(BlurPane under) {
-        pane = under;
-        if (pane != null) pane.follow(card);
-    }
+    boolean entered() { return entered; }
 
-    @Override protected void onDetachedFromWindow() {
-        if (pane != null) pane.close();
-        pane = null;
-        super.onDetachedFromWindow();
-    }
+    boolean typing() { return typing; }
 
     void enter() {
         if (entered || leaving) return;
