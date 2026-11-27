@@ -33,6 +33,9 @@ besar() { adb exec-out screencap -p > $1.png; convert $1.png -resize 720x -quali
 bening 80; kirim --ei henti 0
 adb shell input keyevent KEYCODE_HOME; sleep 5
 adb shell wm 2>&1 | grep -i blur; adb shell getprop ro.surface_flinger.supports_background_blur
+# Pembukaan pertama setelah layanan hidup diperiksa tersendiri.
+buka 85 250; shot awal1; sleep 2; shot awal1b; tutup
+buka 85 250; shot awal2; tutup
 setelan() { adb shell am start -a android.settings.SETTINGS >/dev/null; sleep 2.5; }
 for G in 0 1; do
   kirim --ei gaya $G
@@ -52,6 +55,6 @@ for G in 0 1; do
   kirim --ei gaya $G; dinding; rekam rekvol$G 4; naik; sleep 0.5; naik; sleep 0.4; besar popvol$G; cetak rekvol$G; sleep 2.5
 done
 echo "=== LOG ==="
-adb shell dumpsys window | grep -iE "blur" | head
+adb logcat -d | grep -E "panel dibuka|kaca bening|Choreographer.*Skipped" | head -12
 adb logcat -d | grep -E "ControlCenter|AndroidRuntime|FATAL" | tail -80
 exit 0

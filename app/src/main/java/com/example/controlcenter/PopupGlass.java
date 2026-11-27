@@ -51,7 +51,7 @@ class PopupGlass extends Drawable {
     /** Bening: selaput tipis secukupnya agar tulisan terbaca, dengan tepi berkilau. */
     private void liquid(Canvas c) {
         float r = Math.min(34 * d, box.height() / 2);
-        fill(c, box, r, Theme.alpha(0xFF0A1020, Math.min(215, 60 + (100 - clear) * 3 / 2)));
+        fill(c, box, r, Theme.alpha(0xFF0A1020, Math.min(220, 90 + (100 - clear) * 3 / 2)));
         gradient(c, box, r, false, new int[]{0x24FFFFFF, 0x05FFFFFF, 0x00FFFFFF, 0x14FFFFFF},
                 new float[]{0f, 0.35f, 0.7f, 1f});
         stroke(c, r, 0.5f * d, d, new int[]{0xB3FFFFFF, 0x26FFFFFF, 0x1FFFFFFF, 0x80FFFFFF});
