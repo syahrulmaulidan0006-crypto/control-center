@@ -51,6 +51,7 @@ public class OverlayService extends AccessibilityService {
             removePanel();
             removeHandles();
             showHandles();
+            if (island != null) island.reset();
         }
     };
 
@@ -58,12 +59,23 @@ public class OverlayService extends AccessibilityService {
     private final BroadcastReceiver ticker = new BroadcastReceiver() {
         @Override public void onReceive(Context c, Intent i) {
             Focus.check(OverlayService.this, controls);
+            islandRefresh();
         }
     };
 
+    private Island island;
+
+    /** Panel atau popup sedang tampil, jadi kapsul menyingkir. */
+    boolean busy() { return panel != null || banner != null; }
+
+    private void islandRefresh() { if (island != null) island.refresh(); }
+
     private ChargeView charging;
     private final BroadcastReceiver power = new BroadcastReceiver() {
-        @Override public void onReceive(Context c, Intent i) { showCharging(); }
+        @Override public void onReceive(Context c, Intent i) {
+            showCharging();
+            if (island != null) island.charging();
+        }
     };
 
     private void showCharging() {
@@ -113,6 +125,7 @@ public class OverlayService extends AccessibilityService {
         }
         IntentFilter time = new IntentFilter(Intent.ACTION_TIME_TICK);
         time.addAction(Intent.ACTION_SCREEN_ON);
+        time.addAction(Intent.ACTION_SCREEN_OFF);
         if (Build.VERSION.SDK_INT >= 33) {
             registerReceiver(ticker, time, Context.RECEIVER_NOT_EXPORTED);
         } else {
@@ -125,6 +138,8 @@ public class OverlayService extends AccessibilityService {
         } else {
             registerReceiver(power, plugged);
         }
+        island = new Island(this);
+        island.start();
         android.service.notification.NotificationListenerService.requestRebind(
                 new android.content.ComponentName(this, MusicListener.class));
     }
@@ -160,6 +175,8 @@ public class OverlayService extends AccessibilityService {
             unregisterReceiver(power);
         }
         instance = null;
+        if (island != null) island.stop();
+        island = null;
         removePanel();
         removeCharging();
         if (banner != null) removeBanner(banner);
@@ -171,6 +188,7 @@ public class OverlayService extends AccessibilityService {
     @Override public void onConfigurationChanged(Configuration config) {
         super.onConfigurationChanged(config);
         if (handle == null) return;
+        islandRefresh();
         // Perubahan mode gelap tidak perlu menutup panel.
         if (handle.getTag().equals(config.orientation)) return;
         removePanel();
@@ -192,7 +210,7 @@ public class OverlayService extends AccessibilityService {
 
     private int dp(int v) { return Math.round(v * getResources().getDisplayMetrics().density); }
 
-    private WindowManager.LayoutParams params(int w, int h, int flags) {
+    WindowManager.LayoutParams params(int w, int h, int flags) {
         WindowManager.LayoutParams lp = new WindowManager.LayoutParams(w, h,
                 WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
                 flags | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
@@ -293,6 +311,8 @@ public class OverlayService extends AccessibilityService {
         panel.setProgress(0);
         deck.fade(0);
         wm.addView(deck, panelParams);
+        // Kapsul langsung menyingkir.
+        islandRefresh();
     }
 
     /** Menutup panel notifikasi bawaan yang ikut terbuka (Android 12+). */
@@ -350,6 +370,7 @@ public class OverlayService extends AccessibilityService {
         try { wm.addView(next, bannerParams); }
         catch (RuntimeException e) { return skip("gagal menampilkan: " + e.getMessage()); }
         banner = next;
+        islandRefresh();
         next.enter();
         Diag.popup(this, "tampil");
         android.util.Log.i("ControlCenter", "popup tampil: " + note.getPackageName());
@@ -378,6 +399,7 @@ public class OverlayService extends AccessibilityService {
     void removeBanner(Banner target) {
         if (target.isAttachedToWindow()) wm.removeView(target);
         if (banner == target) banner = null;
+        islandRefresh();
     }
 
     void drag(float progress) {
@@ -476,5 +498,6 @@ public class OverlayService extends AccessibilityService {
         wm.removeView(deck);
         deck = null;
         panel = null;
+        islandRefresh();
     }
 }

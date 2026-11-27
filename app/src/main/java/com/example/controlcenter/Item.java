@@ -77,6 +77,18 @@ enum Item {
     /** Boleh dipasang dan disingkirkan; empat tombol koneksi tetap di kotaknya. */
     boolean movable() { return ordinal() > BLUETOOTH.ordinal(); }
 
+    /** Ukuran: 0 kecil (1x1), 1 lebar (2x1), 2 besar (2x2). */
+    static final int[][] SPANS = {{1, 1}, {2, 1}, {2, 2}};
+
+    static int size(android.content.Context c, Item item) {
+        int size = Prefs.of(c).getInt("size_" + item.name(), 0);
+        return size >= 0 && size < SPANS.length ? size : 0;
+    }
+
+    static void resize(android.content.Context c, Item item, int size) {
+        Prefs.of(c).edit().putInt("size_" + item.name(), size).apply();
+    }
+
     static java.util.List<Item> standard() {
         java.util.List<Item> list = new java.util.ArrayList<>();
         for (int i = ROTATION.ordinal(); i <= POWER.ordinal(); i++) list.add(values()[i]);

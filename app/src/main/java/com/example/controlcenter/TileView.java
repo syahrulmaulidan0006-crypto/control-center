@@ -5,6 +5,11 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.RectF;
+import android.graphics.Typeface;
+import android.text.Layout;
+import android.text.StaticLayout;
+import android.text.TextPaint;
+import android.text.TextUtils;
 import android.graphics.drawable.Drawable;
 import android.view.MotionEvent;
 import android.view.View;
@@ -18,6 +23,8 @@ class TileView extends View {
     private Drawable icon;
     private final int accent, onAccent;
     private boolean on;
+    /** Tombol 2x2: ikon di atas, nama di bawah. */
+    boolean large;
     private float fill;
     private ValueAnimator animator, motion;
     private float t = 1;
@@ -137,15 +144,32 @@ class TileView extends View {
     }
 
     @Override protected void onDraw(Canvas c) {
-        float cx = getWidth() / 2f, cy = getHeight() / 2f;
+        float w = getWidth(), h = getHeight();
         float d = getResources().getDisplayMetrics().density;
-        float r = Math.min(cx, cy) - d;
+        float cx = w / 2, cy = h / 2, r = Math.min(cx, cy) - d;
+        // Bentuk dikenali dari ukurannya: persegi, lebar, atau besar.
+        boolean wide = w > h * 1.5f;
+        if (wide) {
+            Glass.draw(c, paint, new RectF(d, d, w - d, h - d), h / 2 - d, d, 0x1FFFFFFF);
+            r = h / 2 - Math.max(6 * d, h * 0.11f);
+            cx = h / 2;
+        } else if (large) {
+            Glass.draw(c, paint, new RectF(d, d, w - d, h - d), 36 * d, d, 0x1FFFFFFF);
+            r = Math.min(w, h) * 0.24f;
+            cy = h * 0.37f;
+        }
         RectF circle = new RectF(cx - r, cy - r, cx + r, cy + r);
         Glass.draw(c, paint, circle, r, d, 0x1FFFFFFF);
         if (fill > 0) {
             paint.setColor(Theme.alpha(accent, 0xE0));
             c.drawCircle(cx, cy, r * fill, paint);
             Glass.shine(c, paint, circle, r, d);
+        }
+        if (wide) {
+            float x = h + 2 * d;
+            words(c, x, h / 2, w - x - 12 * d, Layout.Alignment.ALIGN_NORMAL);
+        } else if (large) {
+            words(c, 10 * d, h * 0.77f, w - 20 * d, Layout.Alignment.ALIGN_CENTER);
         }
         int half = Math.round(r * 0.48f);
         icon.setBounds(Math.round(cx) - half, Math.round(cy) - half,
@@ -156,6 +180,38 @@ class TileView extends View {
         icon.setAlpha(Math.round(255 * alpha));
         icon.draw(c);
         c.restore();
+    }
+
+    /** Nama (paling banyak dua baris) dan keadaan, dipusatkan pada tinggi middle. */
+    private void words(Canvas c, float x, float middle, float width,
+            Layout.Alignment align) {
+        if (width <= 0) return;
+        float sp = getResources().getDisplayMetrics().scaledDensity;
+        // Huruf sistem yang sangat besar dibatasi agar tetap muat di dalam tombol.
+        sp = Math.min(sp, getResources().getDisplayMetrics().density * 1.15f);
+        StaticLayout name = block(item.label, 13 * sp, 0xFFFFFFFF, true, 2, width, align);
+        StaticLayout state = item.leaves() ? null
+                : block(on ? "Aktif" : "Mati", 11 * sp, 0xB3FFFFFF, false, 1, width, align);
+        float total = name.getHeight() + (state == null ? 0 : state.getHeight());
+        c.save();
+        c.translate(x, middle - total / 2);
+        name.draw(c);
+        if (state != null) {
+            c.translate(0, name.getHeight());
+            state.draw(c);
+        }
+        c.restore();
+    }
+
+    private static StaticLayout block(String value, float size, int color, boolean bold,
+            int lines, float width, Layout.Alignment align) {
+        TextPaint p = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+        p.setTextSize(size);
+        p.setColor(color);
+        if (bold) p.setTypeface(Typeface.DEFAULT_BOLD);
+        return StaticLayout.Builder.obtain(value, 0, value.length(), p, (int) width)
+                .setAlignment(align).setMaxLines(lines)
+                .setEllipsize(TextUtils.TruncateAt.END).setIncludePad(false).build();
     }
 
     @Override public boolean onTouchEvent(MotionEvent e) {

@@ -9,6 +9,7 @@ import android.app.NotificationChannel;
 import android.app.ApplicationExitInfo;
 import android.app.NotificationManager;
 import android.content.ComponentName;
+import android.content.res.ColorStateList;
 import android.content.Intent;
 import android.content.pm.ResolveInfo;
 import android.graphics.Color;
@@ -21,10 +22,10 @@ import android.os.PowerManager;
 import android.provider.Settings;
 import android.view.Gravity;
 import android.view.View;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
-import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 import java.text.SimpleDateFormat;
@@ -39,21 +40,40 @@ import rikka.shizuku.Shizuku;
 
 /** Halaman status dan pengaturan. */
 public class MainActivity extends Activity {
-    private static final int CARD = 0xFF1C2450, MUTED = 0xFFC4CBE8;
-    private LinearLayout root;
+    private static final int MUTED = 0xFFC4CBE8, GOOD = 0xFF37D98A, BAD = 0xFFFF6B5E;
+    private static final String[] TABS = {"Beranda", "Tampilan", "Notifikasi", "Lanjutan"};
+    private static final int[] TAB_ICONS = {R.drawable.ic_home, R.drawable.ic_dark,
+            R.drawable.ic_notifications, R.drawable.ic_settings};
+    private LinearLayout root, bar;
     private ScrollView scroll;
+    private int tab;
+    /** Benar saat berpindah tab, sehingga kartunya muncul berurutan. */
+    private boolean entering = true;
     private final Shizuku.OnRequestPermissionResultListener result = (code, grant) -> build();
     private final Shizuku.OnBinderReceivedListener binder = this::build;
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
+        if (state != null) tab = state.getInt("tab");
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setBackground(new Backdrop());
         root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(18), dp(40), dp(18), dp(28));
+        root.setPadding(dp(16), dp(28), dp(16), dp(24));
+        root.setClipChildren(false);
         scroll = new ScrollView(this);
-        scroll.setBackgroundColor(0xFF0F1536);
+        scroll.setVerticalScrollBarEnabled(false);
         scroll.addView(root);
-        setContentView(scroll);
+        page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        bar = new LinearLayout(this);
+        bar.setPadding(dp(6), dp(6), dp(6), dp(6));
+        LinearLayout.LayoutParams under = new LinearLayout.LayoutParams(-1, -2);
+        under.setMargins(dp(14), dp(6), dp(14), dp(12));
+        page.addView(bar, under);
+        setContentView(page);
+        getWindow().setStatusBarColor(0xFF17275C);
+        getWindow().setNavigationBarColor(0xFF0B0F24);
         Shizuku.addRequestPermissionResultListener(result);
         Shizuku.addBinderReceivedListenerSticky(binder);
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(
@@ -67,6 +87,11 @@ public class MainActivity extends Activity {
         build();
     }
 
+    @Override protected void onSaveInstanceState(Bundle out) {
+        super.onSaveInstanceState(out);
+        out.putInt("tab", tab);
+    }
+
     @Override protected void onDestroy() {
         Shizuku.removeRequestPermissionResultListener(result);
         Shizuku.removeBinderReceivedListener(binder);
@@ -77,34 +102,101 @@ public class MainActivity extends Activity {
         if (root == null) return;
         root.removeAllViews();
         Glass.load(this);
-        title("Status layanan", 28);
-        note("Titik hijau berarti siap. Merah perlu diperbaiki agar tetap berjalan.");
+        tabs();
+        TextView head = label(tab == 0 ? "Control Center" : TABS[tab], 30, Color.WHITE);
+        head.setTypeface(Typeface.DEFAULT_BOLD);
+        head.setPadding(dp(4), 0, 0, dp(6));
+        root.addView(head);
+        if (tab == 0) home();
+        else if (tab == 1) looks();
+        else if (tab == 2) notices();
+        else advanced();
+        if (!entering) return;
+        entering = false;
+        for (int i = 0; i < root.getChildCount() && i < 12; i++) {
+            Motion.enter(root.getChildAt(i), i * 35L, dp(26));
+        }
+    }
 
+    private void tabs() {
+        bar.removeAllViews();
+        bar.setBackground(new Glass(this, 32, 0x2EFFFFFF));
+        for (int i = 0; i < TABS.length; i++) {
+            int index = i;
+            boolean on = i == tab;
+            LinearLayout item = new LinearLayout(this);
+            item.setOrientation(LinearLayout.VERTICAL);
+            item.setGravity(Gravity.CENTER);
+            item.setPadding(0, dp(8), 0, dp(7));
+            if (on) item.setBackground(new Glass(this, 26, Theme.alpha(Theme.accent(this), 0xD9)));
+            ImageView icon = new ImageView(this);
+            icon.setImageResource(TAB_ICONS[i]);
+            icon.setColorFilter(on ? Theme.onAccent(this) : Color.WHITE);
+            item.addView(icon, new LinearLayout.LayoutParams(dp(22), dp(22)));
+            TextView name = label(TABS[i], 11, on ? Theme.onAccent(this) : Color.WHITE);
+            name.setSingleLine(true);
+            name.setGravity(Gravity.CENTER);
+            item.addView(name);
+            item.setContentDescription("Tab " + TABS[i]);
+            item.setOnClickListener(v -> {
+                if (tab == index) { scroll.smoothScrollTo(0, 0); return; }
+                Haptic.tick(this);
+                tab = index;
+                entering = true;
+                build();
+                scroll.scrollTo(0, 0);
+            });
+            Motion.press(item);
+            bar.addView(item, new LinearLayout.LayoutParams(0, -2, 1));
+        }
+    }
+
+    private void home() {
+        List<Object[]> checks = new ArrayList<>();
         String enabled = Settings.Secure.getString(getContentResolver(),
                 Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
         ComponentName service = new ComponentName(this, OverlayService.class);
         boolean accessible = enabled != null && (enabled.contains(service.flattenToString())
                 || enabled.contains(service.flattenToShortString()));
-        status("Aksesibilitas", accessible,
+        check(checks, "Aksesibilitas", accessible,
                 () -> open(Settings.ACTION_ACCESSIBILITY_SETTINGS, false));
-        status("Layanan sedang berjalan", running(), () -> {
+        check(checks, "Layanan sedang berjalan", running(), () -> {
             Toast.makeText(this, "Matikan lalu nyalakan lagi layanan Control Center",
                     Toast.LENGTH_LONG).show();
             open(Settings.ACTION_ACCESSIBILITY_SETTINGS, false);
         });
         NotificationManager nm = getSystemService(NotificationManager.class);
-        status("Akses notifikasi", nm.isNotificationListenerAccessGranted(
+        check(checks, "Akses notifikasi", nm.isNotificationListenerAccessGranted(
                         new ComponentName(this, MusicListener.class)),
                 () -> open(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS, false));
-        status("Bebas penghemat baterai", getSystemService(PowerManager.class)
+        check(checks, "Bebas penghemat baterai", getSystemService(PowerManager.class)
                         .isIgnoringBatteryOptimizations(getPackageName()),
                 () -> open(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, true));
-        status("Ubah pengaturan (kecerahan, rotasi)", Settings.System.canWrite(this),
+        check(checks, "Ubah pengaturan (kecerahan, rotasi)", Settings.System.canWrite(this),
                 () -> open(Settings.ACTION_MANAGE_WRITE_SETTINGS, true));
-        status("Jangan Ganggu", nm.isNotificationPolicyAccessGranted(),
+        check(checks, "Jangan Ganggu", nm.isNotificationPolicyAccessGranted(),
                 () -> open(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS, false));
-        status("Lokasi (daftar Wi-Fi)", checkSelfPermission(
+        check(checks, "Lokasi (daftar Wi-Fi)", checkSelfPermission(
                 Manifest.permission.ACCESS_FINE_LOCATION) == 0, this::permissions);
+        check(checks, "Notifikasi \"Control Center aktif\"", nm.areNotificationsEnabled(),
+                () -> startActivity(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName())));
+
+        int broken = 0;
+        for (Object[] c : checks) if (!(Boolean) c[1]) broken++;
+        row(broken == 0 ? "Semua siap" : broken + " hal perlu diperbaiki", broken == 0
+                ? "Geser dari atas layar untuk memakai Control Center"
+                : "Ketuk kartu bertitik merah di bawah", broken == 0 ? GOOD : BAD, () -> { });
+
+        // Yang bermasalah diletakkan paling atas.
+        title("Status layanan", 18);
+        for (boolean ok : new boolean[]{false, true}) {
+            for (Object[] c : checks) {
+                if ((Boolean) c[1] == ok) status((String) c[0], ok, (Runnable) c[2]);
+            }
+        }
+
+        title("Khusus Xiaomi", 18);
         manual("Mulai otomatis (Xiaomi)", () -> {
             try {
                 startActivity(new Intent().setClassName("com.miui.securitycenter",
@@ -123,40 +215,53 @@ public class MainActivity extends Activity {
                 open(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, true);
             }
         });
-
-        status("Notifikasi \"Control Center aktif\"",
-                getSystemService(NotificationManager.class).areNotificationsEnabled(),
-                () -> startActivity(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-                        .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName())));
-        note("Penting di Xiaomi: buka layar aplikasi terbaru, tekan lama kartu Control "
-                + "Center, lalu ketuk ikon gembok agar tidak ikut dibersihkan.");
+        note("Buka layar aplikasi terbaru, tekan lama kartu Control Center, lalu ketuk "
+                + "ikon gembok agar tidak ikut dibersihkan.");
         if (Build.VERSION.SDK_INT >= 30) history();
+    }
 
-        title("Warna tombol", 20);
+    private void check(List<Object[]> list, String name, boolean ok, Runnable fix) {
+        list.add(new Object[]{name, ok, fix});
+    }
+
+    private void looks() {
+        title("Warna tombol", 18);
         colors();
-
-        title("Tampilan", 20);
+        title("Gaya kaca", 18);
         popupStyles();
+        title("Gerak dan sentuhan", 18);
         toggle("Getar halus saat disentuh", Haptic.KEY, true);
         toggle("Animasi saat mengisi daya", "chargeAnim", true);
+        title("Kapsul melayang", 18);
+        toggle("Tampilkan kapsul", Island.ON, true);
+        note("Muncul di atas layar saat ada lagu, hitung mundur, atau baru mengisi daya. "
+                + "Ketuk untuk membesarkan.");
+        position();
+    }
 
-        title("Notifikasi", 20);
+    private void notices() {
         note("Popup terakhir: " + Diag.read(this));
         button("Tes popup sekarang", this::test);
+        title("Popup dan suara", 18);
         toggle("Popup notifikasi", "popup", true);
         toggle("Suara notifikasi", "sound", true);
         toggle("Getar saat ada notifikasi", "vibrate", true);
         note("Suara mengikuti volume dering dan diam saat HP dalam mode getar atau senyap. "
                 + "Bila getar dimatikan, suara bawaan aplikasi lain juga dibisukan.");
+        toggle("Bisukan suara bawaan (agar tidak dobel)", "muteNative", true);
+        button("Pilih aplikasi yang boleh muncul", this::apps);
+        title("Privasi dan permainan", 18);
         toggle("Sembunyikan isi pesan", "hideContent", false);
         toggle("Sembunyikan popup saat layar penuh", "hideFullscreen", true);
+    }
+
+    private void advanced() {
+        title("Gerakan geser", 18);
         toggle("Geser kiri atas untuk pusat notifikasi", "leftSwipe", true);
         toggle("Matikan area geser saat layar mendatar (game)", "noSwipeLand", false);
-        button("Pilih aplikasi yang boleh muncul", this::apps);
-        toggle("Bisukan suara bawaan (agar tidak dobel)", "muteNative", true);
         boolean heads = Settings.Global.getInt(getContentResolver(),
                 "heads_up_notifications_enabled", 1) == 1;
-        title("Popup bawaan HP", 20);
+        title("Popup bawaan HP", 18);
         button(heads ? "Matikan popup bawaan semua aplikasi (Shizuku)"
                 : "Nyalakan kembali popup bawaan (Shizuku)", () -> headsUp(!heads));
         note(heads ? "Cara terbersih. Memerlukan Shizuku aktif. Sebagian HP mengabaikannya."
@@ -166,7 +271,7 @@ public class MainActivity extends Activity {
         note("Popup bawaan bisa terlihat sekejap, dan notifikasinya hilang dari panel "
                 + "bawaan. Salinannya ada di pusat notifikasi kita.");
 
-        title("Mode koneksi", 20);
+        title("Mode koneksi", 18);
         boolean b = Prefs.is(this, "modeB", false);
         button((b ? "" : "Dipakai: ") + "Mode A, membuka menu sistem", () -> mode(false));
         button((b ? "Dipakai: " : "") + "Mode B, Shizuku", () -> mode(true));
@@ -182,6 +287,52 @@ public class MainActivity extends Activity {
                 Toast.makeText(this, "Shizuku tidak tersedia", Toast.LENGTH_SHORT).show();
             }
         });
+    }
+
+    /** Jarak kapsul dari tepi atas, disesuaikan dengan letak kamera tiap HP. */
+    private void position() {
+        LinearLayout c = card();
+        c.setOrientation(LinearLayout.VERTICAL);
+        c.setGravity(Gravity.NO_GRAVITY);
+        int now = Prefs.of(this).getInt(Island.TOP, 2);
+        TextView name = label("Jarak kapsul dari atas: " + now, 15, Color.WHITE);
+        c.addView(name);
+        slider(c, "Jarak kapsul dari atas", 60, now,
+                value -> name.setText("Jarak kapsul dari atas: " + value),
+                value -> {
+                    Prefs.of(this).edit().putInt(Island.TOP, value).commit();
+                    refreshService();
+                });
+    }
+
+    private void slider(LinearLayout into, String label, int max, int now,
+            java.util.function.IntConsumer moving, java.util.function.IntConsumer done) {
+        SeekBar bar = new SeekBar(this);
+        bar.setMax(max);
+        bar.setProgress(now);
+        bar.setContentDescription(label);
+        bar.setPadding(dp(8), dp(14), dp(8), dp(8));
+        bar.setProgressTintList(ColorStateList.valueOf(0xFFFFFFFF));
+        bar.setThumbTintList(ColorStateList.valueOf(0xFFFFFFFF));
+        bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar s, int value, boolean user) {
+                moving.accept(value);
+            }
+            @Override public void onStartTrackingTouch(SeekBar s) { }
+            @Override public void onStopTrackingTouch(SeekBar s) { done.accept(s.getProgress()); }
+        });
+        into.addView(bar, new LinearLayout.LayoutParams(-1, -2));
+    }
+
+    private void refreshService() {
+        sendBroadcast(new Intent(OverlayService.REFRESH).setPackage(getPackageName()));
+    }
+
+    /** Membangun ulang tanpa memindahkan posisi gulir. */
+    private void rebuildHere() {
+        int y = scroll.getScrollY();
+        build();
+        scroll.post(() -> scroll.scrollTo(0, y));
     }
 
     @SuppressWarnings("deprecation")
@@ -322,18 +473,17 @@ public class MainActivity extends Activity {
             item.setContentDescription("Warna " + Theme.NAMES[i]);
             item.setOnClickListener(v -> {
                 Prefs.of(this).edit().putInt("color", index).commit();
-                int y = scroll.getScrollY();
-                build();
-                scroll.post(() -> scroll.scrollTo(0, y));
+                Haptic.click(this);
+                rebuildHere();
             });
             row.addView(item, new LinearLayout.LayoutParams(
-                    (getResources().getDisplayMetrics().widthPixels - dp(36)) / 4, -2));
+                    (getResources().getDisplayMetrics().widthPixels - dp(32)) / 4, -2));
         }
     }
 
     /** Dua contoh popup di atas latar berwarna; ketuk untuk memilih. */
     private void popupStyles() {
-        note("Gaya kaca untuk popup, tombol, dan kartu");
+        note("Dipakai untuk popup, tombol, dan kartu");
         int chosen = PopupGlass.chosen(this);
         View[] samples = new View[PopupGlass.NAMES.length];
         for (int i = 0; i < PopupGlass.NAMES.length; i++) {
@@ -364,9 +514,8 @@ public class MainActivity extends Activity {
             frame.setContentDescription("Gaya kaca " + PopupGlass.NAMES[i]);
             frame.setOnClickListener(v -> {
                 Prefs.of(this).edit().putInt(PopupGlass.KEY, index).commit();
-                int y = scroll.getScrollY();
-                build();
-                scroll.post(() -> scroll.scrollTo(0, y));
+                Haptic.click(this);
+                rebuildHere();
             });
             LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2);
             p.topMargin = dp(8);
@@ -383,25 +532,12 @@ public class MainActivity extends Activity {
         int now = PopupGlass.clearness(this);
         TextView name = label("Kebeningan popup: " + now + "%", 15, Color.WHITE);
         c.addView(name);
-        SeekBar bar = new SeekBar(this);
-        bar.setMax(100);
-        bar.setProgress(now);
-        bar.setContentDescription("Kebeningan popup");
-        bar.setPadding(dp(8), dp(14), dp(8), dp(8));
-        bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override public void onProgressChanged(SeekBar s, int value, boolean user) {
-                name.setText("Kebeningan popup: " + value + "%");
-                for (int i = 0; i < samples.length; i++) {
-                    samples[i].setBackground(new PopupGlass(MainActivity.this, i, value));
-                }
+        slider(c, "Kebeningan popup", 100, now, value -> {
+            name.setText("Kebeningan popup: " + value + "%");
+            for (int i = 0; i < samples.length; i++) {
+                samples[i].setBackground(new PopupGlass(this, i, value));
             }
-            @Override public void onStartTrackingTouch(SeekBar s) { }
-            @Override public void onStopTrackingTouch(SeekBar s) {
-                Prefs.of(MainActivity.this).edit()
-                        .putInt(PopupGlass.CLEAR, s.getProgress()).commit();
-            }
-        });
-        c.addView(bar, new LinearLayout.LayoutParams(-1, -2));
+        }, value -> Prefs.of(this).edit().putInt(PopupGlass.CLEAR, value).commit());
         TextView hint = label("0% pekat, 100% hampir bening. Makin bening, tulisan makin "
                 + "sulit dibaca di layar terang.", 13, MUTED);
         c.addView(hint);
@@ -418,13 +554,13 @@ public class MainActivity extends Activity {
     private void title(String value, int size) {
         TextView t = label(value, size, Color.WHITE);
         t.setTypeface(Typeface.DEFAULT_BOLD);
-        t.setPadding(0, dp(16), 0, dp(6));
+        t.setPadding(dp(4), dp(18), 0, dp(4));
         root.addView(t);
     }
 
     private void note(String value) {
         TextView t = label(value, 13, MUTED);
-        t.setPadding(0, dp(4), 0, dp(4));
+        t.setPadding(dp(4), dp(6), dp(4), dp(2));
         root.addView(t);
     }
 
@@ -432,10 +568,7 @@ public class MainActivity extends Activity {
         LinearLayout c = new LinearLayout(this);
         c.setGravity(Gravity.CENTER_VERTICAL);
         c.setPadding(dp(16), dp(14), dp(16), dp(14));
-        GradientDrawable d = new GradientDrawable();
-        d.setColor(CARD);
-        d.setCornerRadius(dp(22));
-        c.setBackground(d);
+        c.setBackground(new Glass(this, 26, 0x1FFFFFFF));
         LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2);
         p.topMargin = dp(8);
         root.addView(c, p);
@@ -457,6 +590,7 @@ public class MainActivity extends Activity {
         words.addView(label(detail, 13, MUTED));
         c.addView(words, new LinearLayout.LayoutParams(0, -2, 1));
         c.setOnClickListener(x -> click.run());
+        Motion.press(c);
     }
 
     private void status(String name, boolean ok, Runnable click) {
@@ -471,23 +605,29 @@ public class MainActivity extends Activity {
         LinearLayout c = card();
         c.addView(label(name, 15, Color.WHITE));
         c.setOnClickListener(v -> click.run());
+        Motion.press(c);
     }
 
     private void toggle(String name, String key, boolean fallback) {
         LinearLayout c = card();
-        Switch s = new Switch(this);
-        s.setText(name);
-        s.setTextColor(Color.WHITE);
-        s.setTextSize(15);
-        s.setChecked(Prefs.is(this, key, fallback));
-        s.setOnCheckedChangeListener((v, on) -> {
+        c.addView(label(name, 15, Color.WHITE), new LinearLayout.LayoutParams(0, -2, 1));
+        GlassSwitch s = new GlassSwitch(this, Theme.accent(this), Prefs.is(this, key, fallback));
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(dp(54), dp(31));
+        p.leftMargin = dp(12);
+        c.addView(s, p);
+        c.setContentDescription(name + (Prefs.is(this, key, fallback) ? ", nyala" : ", mati"));
+        c.setOnClickListener(v -> {
+            boolean on = !Prefs.is(this, key, fallback);
             Prefs.of(this).edit().putBoolean(key, on).commit();
-            if (key.equals("leftSwipe") || key.equals("noSwipeLand") || key.equals("sound") || key.equals("muteNative")
-                    || key.equals("vibrate")) {
-                sendBroadcast(new Intent(OverlayService.REFRESH).setPackage(getPackageName()));
+            Haptic.click(this);
+            s.setOn(on);
+            c.setContentDescription(name + (on ? ", nyala" : ", mati"));
+            if (key.equals("leftSwipe") || key.equals("noSwipeLand") || key.equals("sound")
+                    || key.equals("muteNative") || key.equals("vibrate")
+                    || key.equals(Island.ON)) {
+                refreshService();
             }
         });
-        c.addView(s, new LinearLayout.LayoutParams(-1, -2));
     }
 
     private void open(String action, boolean forPackage) {
