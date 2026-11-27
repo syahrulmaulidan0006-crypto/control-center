@@ -45,7 +45,13 @@ class Deck extends FrameLayout {
 
     private static float place(Sheet s) { return s instanceof Center ? 0 : 1; }
 
-    void fade(float shown) { dots.setAlpha(shown); }
+    /** Latar diam di tempat; hanya isi halaman yang bergerak. */
+    void fade(float shown) {
+        dots.setAlpha(shown);
+        if (getBackground() != null) {
+            getBackground().setAlpha(Math.round(255 * Math.max(0, Math.min(1, shown * 1.4f))));
+        }
+    }
 
     /** Titik disembunyikan selagi ada jendela di atas halaman. */
     void dots(boolean visible) {
@@ -92,13 +98,17 @@ class Deck extends FrameLayout {
         dots.invalidate();
     }
 
-    /** away: 0 = di tengah layar, 1 = sudah keluar. */
+    /**
+     * away: 0 = di tengah layar, 1 = sudah keluar. Halaman hanya bergeser sedikit sambil
+     * melebur, sehingga tidak ada tepi halaman yang terlihat memotong isi.
+     */
     private void page(Sheet v, float x, float away) {
         v.parallax(Math.signum(x) * away);
-        v.setTranslationX(x);
-        v.setAlpha(1 - 0.55f * away);
-        v.setScaleX(1 - 0.08f * away);
-        v.setScaleY(1 - 0.08f * away);
+        float seen = Math.max(0, 1 - away * 1.5f);
+        v.setTranslationX(x * 0.28f);
+        v.setAlpha(seen * seen * (3 - 2 * seen));
+        v.setScaleX(1 - 0.07f * away);
+        v.setScaleY(1 - 0.07f * away);
     }
 
     /** Meluncur ke halaman tujuan, melanjutkan kecepatan jari. */
@@ -112,9 +122,9 @@ class Deck extends FrameLayout {
         float distance = Math.abs(end - moved), toward = go ? speed : -speed;
         // Kurva kubik mulai dengan kecepatan 3 x jarak / durasi, sama dengan jari.
         float millis = toward > flick
-                ? 3000 * distance * Math.max(1, getWidth()) / toward : 260 + 200 * distance;
+                ? 3000 * distance * Math.max(1, getWidth()) / toward : 300 + 240 * distance;
         slide = ValueAnimator.ofFloat(moved, end);
-        slide.setDuration((long) Math.max(200, Math.min(440, millis)));
+        slide.setDuration((long) Math.max(240, Math.min(520, millis)));
         slide.setInterpolator(t -> 1 - (1 - t) * (1 - t) * (1 - t));
         slide.addUpdateListener(a -> move((float) a.getAnimatedValue()));
         slide.addListener(new AnimatorListenerAdapter() {

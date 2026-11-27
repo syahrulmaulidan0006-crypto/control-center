@@ -21,6 +21,8 @@ class Stack extends FrameLayout {
         depth = Math.min(2, hidden);
         setWillNotDraw(false);
         setClipChildren(false);
+        // Tanpa ini kartu yang digeser terpotong di tepi tumpukan karena ada padding bawah.
+        setClipToPadding(false);
         setPadding(0, 0, 0, Math.round(depth * STEP * d));
         addView(front, new LayoutParams(-1, -2));
     }

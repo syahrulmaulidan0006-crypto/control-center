@@ -208,6 +208,7 @@ class TileView extends View {
         TextPaint p = new TextPaint(Paint.ANTI_ALIAS_FLAG);
         p.setTextSize(size);
         p.setColor(color);
+        p.setShadowLayer(size * 0.25f, 0, size * 0.08f, 0xA6000000);
         if (bold) p.setTypeface(Typeface.DEFAULT_BOLD);
         return StaticLayout.Builder.obtain(value, 0, value.length(), p, (int) width)
                 .setAlignment(align).setMaxLines(lines)

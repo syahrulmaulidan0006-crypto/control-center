@@ -33,24 +33,42 @@ class Glass extends Drawable {
     /** Gaya yang sedang dipakai; diperbarui setiap panel, popup, atau jendela dibuat. */
     static int style = PopupGlass.LIQUID;
 
-    static void load(Context c) { style = PopupGlass.chosen(c); }
+    /** Kebeningan 0 (pekat) sampai 1 (sebening kaca). */
+    static float clear = 0.8f;
+
+    static void load(Context c) {
+        style = PopupGlass.chosen(c);
+        clear = PopupGlass.clearness(c) / 100f;
+    }
+
+    /** Warna tipis ikut memudar sesuai kebeningan; warna pekat (tombol aktif) tetap. */
+    private static int thin(int color, float strength) {
+        int alpha = color >>> 24;
+        if (alpha >= 0xC0) return color;
+        return Theme.alpha(color, Math.round(alpha * (1 - strength * clear)));
+    }
+
+    private static int[] thin(int[] colors, float strength) {
+        for (int i = 0; i < colors.length; i++) colors[i] = thin(colors[i], strength);
+        return colors;
+    }
 
     static void draw(Canvas c, Paint paint, RectF r, float radius, float density, int tint) {
         boolean frosted = style == PopupGlass.FROSTED;
         paint.setStyle(Paint.Style.FILL);
         paint.setShader(null);
-        paint.setColor(tint);
+        paint.setColor(thin(tint, 0.82f));
         c.drawRoundRect(r, radius, radius, paint);
         if (frosted) {
             // Lapisan susu dan bintik halus membuat kaca terlihat buram.
-            paint.setColor(0x14DCE4FF);
+            paint.setColor(thin(0x14DCE4FF, 0.65f));
             c.drawRoundRect(r, radius, radius, paint);
         }
         paint.setColor(0xFFFFFFFF);
-        paint.setShader(new LinearGradient(r.left, r.top, r.right, r.bottom, frosted
+        paint.setShader(new LinearGradient(r.left, r.top, r.right, r.bottom, thin(frosted
                 ? new int[]{0x30FFFFFF, 0x16FFFFFF, 0x0CFFFFFF, 0x14FFFFFF}
                 : new int[]{0x2EFFFFFF, 0x06FFFFFF, 0x02FFFFFF, 0x1CFFFFFF},
-                new float[]{0f, 0.4f, 0.7f, 1f}, Shader.TileMode.CLAMP));
+                frosted ? 0.6f : 0.75f), new float[]{0f, 0.4f, 0.7f, 1f}, Shader.TileMode.CLAMP));
         c.drawRoundRect(r, radius, radius, paint);
         if (frosted) {
             paint.setShader(new BitmapShader(PopupGlass.grain(), Shader.TileMode.REPEAT,
@@ -72,7 +90,7 @@ class Glass extends Drawable {
             // Lengkung tebal yang membias: lebarnya mengikuti ukuran benda.
             float lens = Math.min(Math.min(r.width(), r.height()) * 0.2f, density * 14);
             paint.setShader(new LinearGradient(r.left, r.top, r.right, r.bottom,
-                    new int[]{0x2BFFFFFF, 0x03FFFFFF, 0x03FFFFFF, 0x22FFFFFF},
+                    thin(new int[]{0x2BFFFFFF, 0x03FFFFFF, 0x03FFFFFF, 0x22FFFFFF}, 0.45f),
                     new float[]{0f, 0.35f, 0.65f, 1f}, Shader.TileMode.CLAMP));
             for (int i = 3; i >= 1; i--) {
                 float width = lens * i / 3f;
